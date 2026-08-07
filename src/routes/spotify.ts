@@ -1,15 +1,13 @@
 import express from "express";
 import SpotifyWebApi from "spotify-web-api-node";
-import { URLSearchParams } from "url";
-import { default as Config, default as config } from "../config";
+import config from "../config";
 import { ITokenExpiryPair } from "../dto";
 import { randomString } from "../utils";
 import { isStoredTokenValid } from "../utils/spotify";
 
 export const subRoute = "/api/spotify";
 
-// Bevorzuge immer die explizit konfigurierte REDIRECT_URI
-const getRedirectUri = (req: express.Request) => {
+const getRedirectUri = (req: express.Request): string => {
   if (process.env.SPOTIFY_REDIRECT_URI) {
     return process.env.SPOTIFY_REDIRECT_URI;
   }
@@ -18,21 +16,58 @@ const getRedirectUri = (req: express.Request) => {
   return `${protocol}://${host}${subRoute}/authentication-callback`;
 };
 
-const millisecondsOffsetFromNow = (offset: number) => new Date().getTime() + offset * 1000;
+const millisecondsOffsetFromNow = (offsetInSeconds: number): number =>
+  Date.now() + offsetInSeconds * 1000;
 
 const router = express.Router();
 
+// Redundanten Config-Import bereinigt
+const Config = config;
+
+/**
+ * Hilfsfunktion zum Erneuern des Access-Tokens
+ */
+async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPair> {
+  const spotifyApi = new SpotifyWebApi({
+    clientId: Config.spotify.client_id,
+    clientSecret: Config.spotify.client_secret,
+    redirectUri: getRedirectUri(req)
+  });
+
+  spotifyApi.setAccessToken(req.session.access_token);
+  spotifyApi.setRefreshToken(req.session.refresh_token);
+
+  const refreshResponse = await spotifyApi.refreshAccessToken();
+  const expiresAt = millisecondsOffsetFromNow(refreshResponse.body.expires_in);
+
+  req.session.access_token = refreshResponse.body.access_token;
+  req.session.expires_at = expiresAt;
+
+  // Falls Spotify ein neues Refresh Token mitliefert
+  if (refreshResponse.body.refresh_token) {
+    req.session.refresh_token = refreshResponse.body.refresh_token;
+  }
+
+  return {
+    access_token: req.session.access_token,
+    expires_at: req.session.expires_at
+  };
+}
+
+/**
+ * GET /api/spotify/authenticate
+ * Startet den OAuth 2.0 Auth-Code-Flow
+ */
 router.get("/authenticate", (req, res) => {
-  if (req.session === null) throw new Error("Session has not been set");
+  if (!req.session) throw new Error("Session has not been set");
 
   const redirectUri = getRedirectUri(req);
   const spotifyApi = new SpotifyWebApi({
     clientId: Config.spotify.client_id,
     redirectUri
   });
+  
   const state = randomString(16);
-
-  // Fallback auf CLIENT_URL, falls kein Referer vorhanden ist
   const origin = req.headers.referer || process.env.CLIENT_URL || "/";
 
   const authorizeURL = spotifyApi.createAuthorizeURL(
@@ -47,24 +82,32 @@ router.get("/authenticate", (req, res) => {
   req.session.access_token = undefined;
   req.session.refresh_token = undefined;
 
-  // Redirect ausführen (ohne res.end())
   res.redirect(authorizeURL);
 });
 
+/**
+ * GET /api/spotify/authentication-callback
+ * Empfängt den Auth-Code von Spotify
+ */
 router.get("/authentication-callback", async (req, res) => {
-  if (req.session === null) throw new Error("Session has not been set");
+  if (!req.session) throw new Error("Session has not been set");
 
-  // Fallback sicherstellen, damit keine 'undefined'-Pfade entstehen
   const requestOrigin = req.session.authentication_origin || process.env.CLIENT_URL || "/";
-  const { subdirectory } = config.client;
+  const { subdirectory } = Config.client;
+  const { code, state, error } = req.query;
 
-  const { code, state } = req.query;
-
-  // State-Validierung
-  if (state === undefined || state !== req.session.authentication_state) {
-    console.error("Unexpected state value");
-    return res.redirect(`${requestOrigin}${subdirectory || ""}`);
+  // Fall 1: User hat in Spotify auf "Abbrechen" geklickt
+  if (error) {
+    console.warn("Spotify authentication denied by user:", error);
+    return res.redirect(`${requestOrigin}${subdirectory || ""}?error=access_denied`);
   }
+
+  // Fall 2: State-Validierung
+  if (!state || state !== req.session.authentication_state) {
+    console.error("Unexpected state value in OAuth callback");
+    return res.redirect(`${requestOrigin}${subdirectory || ""}?error=state_mismatch`);
+  }
+
   req.session.authentication_state = undefined;
   req.session.authentication_origin = undefined;
 
@@ -79,70 +122,89 @@ router.get("/authentication-callback", async (req, res) => {
     });
 
     const authorizationResponse = await spotifyApi.authorizationCodeGrant(code as string);
+    
     req.session.expires_at = millisecondsOffsetFromNow(authorizationResponse.body.expires_in);
     req.session.access_token = authorizationResponse.body.access_token;
     req.session.refresh_token = authorizationResponse.body.refresh_token;
 
-    const responseData: ITokenExpiryPair = {
-      access_token: req.session.access_token,
-      expires_at: req.session.expires_at
-    };
-
+    // Ziel-URL ohne Tokens in den Query-Parametern aufbauen (Sicherer!)
     const baseUrl = requestOrigin.endsWith("/") ? requestOrigin.slice(0, -1) : requestOrigin;
     const sub = subdirectory ? (subdirectory.startsWith("/") ? subdirectory : `/${subdirectory}`) : "";
-    const redirectUrl = `${baseUrl}${sub}?${new URLSearchParams(responseData as any)}`;
+    const redirectUrl = `${baseUrl}${sub}`;
 
     res.redirect(redirectUrl);
-  } catch (error) {
-    console.error("Error during authorizationCodeGrant:", error);
-    res.redirect(`${requestOrigin}${subdirectory || ""}`);
+  } catch (err) {
+    console.error("Error during authorizationCodeGrant:", err);
+    res.redirect(`${requestOrigin}${subdirectory || ""}?error=token_grant_failed`);
   }
 });
 
-router.get("/token", (req, res) => {
-  if (req.session === null) throw new Error("Session has not been set");
+/**
+ * GET /api/spotify/token
+ * Liefert das aktuelle Token. Veranlasst einen Auto-Refresh, falls es bald abläuft.
+ */
+router.get("/token", async (req, res) => {
+  if (!req.session) throw new Error("Session has not been set");
 
-  if (!isStoredTokenValid(req)) {
-    return res.status(401).send("No token available");
+  if (!req.session.access_token || !req.session.refresh_token) {
+    return res.status(401).json({ error: "No Spotify session available" });
+  }
+
+  const now = Date.now();
+  const expiresAt = req.session.expires_at || 0;
+  // Auto-Refresh, wenn das Token in unter 60 Sekunden abläuft
+  const isExpiringSoon = expiresAt - now < 60000;
+
+  if (isExpiringSoon || !isStoredTokenValid(req)) {
+    try {
+      const refreshedData = await refreshSpotifyToken(req);
+      return res.json(refreshedData);
+    } catch (err) {
+      return res.status(401).json({ error: "Session expired, re-authentication required" });
+    }
   }
 
   const responseData: ITokenExpiryPair = {
     access_token: req.session.access_token,
     expires_at: req.session.expires_at
   };
-  res.json(responseData);
+
+  return res.json(responseData);
 });
 
+/**
+ * GET /api/spotify/refresh-token
+ * Manuelles Erneuern des Access-Tokens via Refresh-Token
+ */
 router.get("/refresh-token", async (req, res) => {
-  if (req.session === null) throw new Error("Session has not been set");
+  if (!req.session) throw new Error("Session has not been set");
 
-  if (!isStoredTokenValid(req)) {
-    return res.status(401).send("No token available");
+  // FIX: Prüft nun auf refresh_token anstelle des abgelaufenen access_tokens!
+  if (!req.session.refresh_token) {
+    return res.status(401).json({ error: "No refresh token available in session" });
   }
 
   try {
-    const spotifyApi = new SpotifyWebApi({
-      clientId: Config.spotify.client_id,
-      clientSecret: Config.spotify.client_secret,
-      redirectUri: getRedirectUri(req)
-    });
-
-    spotifyApi.setAccessToken(req.session.access_token);
-    spotifyApi.setRefreshToken(req.session.refresh_token);
-
-    const refreshResponse = await spotifyApi.refreshAccessToken();
-    req.session.expires_at = millisecondsOffsetFromNow(refreshResponse.body.expires_in);
-    req.session.access_token = refreshResponse.body.access_token;
-
-    const responseData: ITokenExpiryPair = {
-      access_token: req.session.access_token,
-      expires_at: req.session.expires_at
-    };
-    res.json(responseData);
-  } catch (error) {
-    console.error("Error refreshing token:", error);
-    res.status(500).send("Failed to refresh token");
+    const responseData = await refreshSpotifyToken(req);
+    return res.json(responseData);
+  } catch (err) {
+    console.error("Error refreshing token:", err);
+    return res.status(500).json({ error: "Failed to refresh token" });
   }
+});
+
+/**
+ * POST /api/spotify/logout
+ * Entfernt die Spotify-Tokens aus der aktuellen Session
+ */
+router.post("/logout", (req, res) => {
+  if (!req.session) throw new Error("Session has not been set");
+
+  req.session.access_token = undefined;
+  req.session.refresh_token = undefined;
+  req.session.expires_at = undefined;
+
+  return res.json({ success: true, message: "Logged out from Spotify" });
 });
 
 export default router;
