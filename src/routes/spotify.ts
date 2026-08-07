@@ -8,12 +8,21 @@ import { isStoredTokenValid } from "../utils/spotify";
 export const subRoute = "/api/spotify";
 
 const getRedirectUri = (req: express.Request): string => {
+  // 1. Priorität: Explizit gesetzte Umgebungsvariable
   if (process.env.SPOTIFY_REDIRECT_URI) {
     return process.env.SPOTIFY_REDIRECT_URI;
   }
-  const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-  const host = req.headers.host;
-  return `${protocol}://${host}${subRoute}/authentication-callback`;
+
+  // 2. Fallback: Automatische Erkennung der Vercel Domain
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  const protocol = req.headers["x-forwarded-proto"] || "https";
+
+  if (!host) {
+    console.error("CRITICAL: Unable to determine host for redirect URI");
+    return "https://spotify-lyrics-viewer-sooty.vercel.app/api/spotify/authentication-callback";
+  }
+
+  return `${protocol}://${host}/api/spotify/authentication-callback`;
 };
 
 const millisecondsOffsetFromNow = (offsetInSeconds: number): number =>
