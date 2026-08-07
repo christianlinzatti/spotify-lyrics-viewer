@@ -7,6 +7,7 @@ import fs from "fs";
 import https from "https";
 import path from "path";
 import Config from "./config";
+import ArtistRoutes, { subRoute as artistSubRoute } from "./routes/artist";
 import LyricsRoutes, { subRoute as lyricsSubRoute } from "./routes/lyrics";
 import SessionRoutes, { subRoute as sessionSubRoute } from "./routes/session";
 import SpotifyRoutes, { subRoute as spotifySubRoute } from "./routes/spotify";
@@ -71,6 +72,7 @@ app.use((req, res, next) => {
 app.use(sessionSubRoute, SessionRoutes);
 app.use(spotifySubRoute, SpotifyRoutes);
 app.use(lyricsSubRoute, LyricsRoutes);
+app.use(artistSubRoute, ArtistRoutes);
 
 // Statische Dateien nur lokal servieren (auf Vercel übernimmt das vercel.json / CDN)
 if (!isProduction) {
