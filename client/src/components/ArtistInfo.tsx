@@ -7,7 +7,6 @@ import {
   Grid,
   Typography,
   Chip,
-  Divider,
   Link,
   useTheme,
   useMediaQuery
@@ -121,7 +120,7 @@ interface ArtistInfoProps {
 const ArtistInfo: React.FC<ArtistInfoProps> = ({ artistName }) => {
   const classes = useStyles();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  useMediaQuery(theme.breakpoints.down("sm"));
   const [artistData, setArtistData] = useState<ArtistData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
