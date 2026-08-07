@@ -1,7 +1,8 @@
-import { Box, CircularProgress, Typography } from "@material-ui/core";
+import { Box, CircularProgress, Typography, Divider } from "@material-ui/core";
 import React from "react";
 import { PlayingStatePaused, PlayingStatePlaying } from "../../types/currentlyPlayingState";
 import { ITrackLyrics } from "../../types/trackLyrics";
+import ArtistInfo from "../../components/ArtistInfo";
 import LyricsDisplay from "./LyricsDisplay";
 
 interface IProps {
@@ -10,6 +11,8 @@ interface IProps {
 }
 
 const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currentlyPlayingSong }) => {
+  const artistName = currentlyPlayingSong?.currentlyPlayingObject?.item?.artists?.[0]?.name;
+
   // No lyrics yet
   if (lyricDetails === undefined) {
     return (
@@ -24,6 +27,12 @@ const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currently
     return (
       <Box textAlign="center">
         <Typography>No lyrics found for the current track.</Typography>
+        {artistName && (
+          <>
+            <Divider style={{ margin: "2rem 0" }} />
+            <ArtistInfo artistName={artistName} />
+          </>
+        )}
       </Box>
     );
   }
@@ -45,11 +54,19 @@ const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currently
 
   // Lyrics found
   return (
-    <LyricsDisplay
-      lyricsDetails={lyricDetails.lyrics}
-      progressMs={currentlyPlayingSong?.currentlyPlayingObject?.progress_ms ?? 0}
-      paused={!currentlyPlayingSong?.currentlyPlayingObject?.is_playing ?? false}
-    />
+    <Box>
+      <LyricsDisplay
+        lyricsDetails={lyricDetails.lyrics}
+        progressMs={currentlyPlayingSong?.currentlyPlayingObject?.progress_ms ?? 0}
+        paused={!currentlyPlayingSong?.currentlyPlayingObject?.is_playing ?? false}
+      />
+      {artistName && (
+        <>
+          <Divider style={{ margin: "2rem 0" }} />
+          <ArtistInfo artistName={artistName} />
+        </>
+      )}
+    </Box>
   );
 };
 
