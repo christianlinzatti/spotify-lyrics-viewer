@@ -59,30 +59,52 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
  * Startet den OAuth 2.0 Auth-Code-Flow
  */
 router.get("/authenticate", (req, res) => {
-  if (!req.session) throw new Error("Session has not been set");
+  // 1. Sichere Session-Prüfung ohne unhandled Exception
+  if (!req.session) {
+    console.error("Express session middleware is missing or not configured correctly.");
+    return res.status(500).json({ error: "Session middleware is not initialized" });
+  }
 
-  const redirectUri = getRedirectUri(req);
-  const spotifyApi = new SpotifyWebApi({
-    clientId: Config.spotify.client_id,
-    redirectUri
-  });
-  
-  const state = randomString(16);
-  const origin = req.headers.referer || process.env.CLIENT_URL || "/";
+  // 2. Prüfung der Spotify Client ID
+  if (!Config.spotify?.client_id) {
+    console.error("Config.spotify.client_id is missing. Check your Vercel Environment Variables!");
+    return res.status(500).json({ error: "Spotify Client ID is not configured on server" });
+  }
 
-  const authorizeURL = spotifyApi.createAuthorizeURL(
-    Config.spotify.permission_scope.split(" "),
-    state
-  );
+  // 3. Sicheres Parsing der Permission Scopes (verhindert .split() Crash)
+  const rawScopes = Config.spotify?.permission_scope;
+  let scopes: string[] = [
+    "user-read-currently-playing",
+    "user-read-playback-state"
+  ]; // Defensiver Fallback
 
-  req.session.authentication_state = state;
-  req.session.authentication_origin = origin;
-  req.session.redirected_uri = redirectUri;
-  req.session.expires_at = undefined;
-  req.session.access_token = undefined;
-  req.session.refresh_token = undefined;
+  if (Array.isArray(rawScopes)) {
+    scopes = rawScopes;
+  } else if (typeof rawScopes === "string" && rawScopes.trim() !== "") {
+    scopes = rawScopes.split(" ").filter(Boolean);
+  }
 
-  res.redirect(authorizeURL);
+  try {
+    const redirectUri = getRedirectUri(req);
+    const spotifyApi = new SpotifyWebApi({
+      clientId: Config.spotify.client_id,
+      redirectUri
+    });
+
+    const state = randomString(16);
+    const origin = req.headers.referer || process.env.CLIENT_URL || "/";
+
+    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
+
+    req.session.authentication_state = state;
+    req.session.authentication_origin = origin;
+    req.session.redirected_uri = redirectUri;
+
+    return res.redirect(authorizeURL);
+  } catch (error) {
+    console.error("Failed to generate Spotify authorization URL:", error);
+    return res.status(500).json({ error: "Failed to initiate Spotify authentication" });
+  }
 });
 
 /**
