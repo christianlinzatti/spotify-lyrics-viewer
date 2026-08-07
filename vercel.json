@@ -19,7 +19,12 @@
       "dest": "src/index.ts"
     },
     {
-      "handle": "filesystem"
+      "src": "/static/(.*)",
+      "dest": "client/static/$1"
+    },
+    {
+      "src": "/(.*\\.(js|css|json|png|jpg|jpeg|svg|ico|woff|woff2|map))",
+      "dest": "client/$1"
     },
     {
       "src": "/(.*)",
