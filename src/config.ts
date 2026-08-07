@@ -25,6 +25,9 @@ const config = {
     access_token:
       process.env.GENIUS_ACCESS_TOKEN === "" ? undefined : process.env.GENIUS_ACCESS_TOKEN
   },
+  lastfm: {
+    api_key: process.env.LASTFM_API_KEY === "" ? undefined : process.env.LASTFM_API_KEY
+  },
   server: {
     allowed_origins: serverAllowedOrigins.split(","),
     session_keys: serverSessionKeys.split(" ")
