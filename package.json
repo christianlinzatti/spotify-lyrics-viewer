@@ -36,7 +36,8 @@
     "express": "^4.17.1",
     "lrc-kit": "1.1.1",
     "spotify-web-api-node": "^4.0.0",
-    "typescript": "^3.9.4"
+    "typescript": "^3.9.4",
+    "node-cache": "^5.1.2"
   },
   "devDependencies": {
     "prettier": "^3.2.4",
