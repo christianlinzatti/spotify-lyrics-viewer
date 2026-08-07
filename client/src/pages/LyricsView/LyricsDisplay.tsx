@@ -41,38 +41,38 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
     250
   );
 
-  const isSyncingPossible = lyricsDetails.syncedLyrics !== null;
+  const isSyncingPossible = lyricsDetails.syncedLyrics !== null && lyricsDetails.syncedLyrics.length > 0;
 
-  // Highlight text when the search is changed
+  // 1. Highlight text when search changes
   useEffect(() => {
     if (lyricsRef.current !== null) {
       const instance = new MarkJS(lyricsRef.current);
       instance.unmark();
-      if (search !== "") {
+      if (search.trim() !== "") {
         instance.mark(search);
       }
     }
   }, [search, lyricsDetails]);
 
-  // Focus search input when the search button is clicked
+  // 2. Focus search input when search button is clicked (FIX: inputRef am TextField ergänzt)
   useEffect(() => {
     if (searchShown && searchInputRef.current !== null) {
       searchInputRef.current.focus();
     }
   }, [searchShown]);
 
-  // Automatically scroll to highlighted text
+  const lyricsState = useMemo(
+    () => calculateLyricsState(lyricsDetails, smoothedProgressMs, syncEnabled),
+    [lyricsDetails, smoothedProgressMs, syncEnabled]
+  );
+
+  // 3. Automatically scroll to highlighted text ONLY when the highlighted line changes
   useEffect(() => {
     const element = highlightedRef.current;
-    if (syncEnabled && element !== null) {
+    if (syncEnabled && element !== null && lyricsState.highlighted !== "") {
       element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     }
-  }, [syncEnabled, smoothedProgressMs]);
-
-  const lyricsState = useMemo(
-    () => calculateLyricsState(lyricsDetails, smoothedProgressMs, syncEnabled, paused),
-    [lyricsDetails, smoothedProgressMs, syncEnabled, paused]
-  );
+  }, [syncEnabled, lyricsState.highlighted]); // Abhängigkeit auf highlighted reduziert!
 
   const onUserSearch = (event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) =>
     setSearch(event.currentTarget.value ?? "");
@@ -85,6 +85,7 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
         {searchShown ? (
           <Box mb={1}>
             <TextField
+              inputRef={searchInputRef} // FIX: Ref hier gebunden!
               variant="outlined"
               value={search}
               onChange={onUserSearch}
@@ -127,7 +128,7 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
         </Typography>
         <Box mt={2} textAlign="left">
           <Typography id="lyrics-provider">
-            <Link href={lyricsDetails.attribution}>
+            <Link href={lyricsDetails.attribution} target="_blank" rel="noopener noreferrer">
               Lyrics for {lyricsDetails.title} by {lyricsDetails.artist}
             </Link>
           </Typography>
@@ -137,16 +138,16 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
   );
 };
 
+// Effiziente Berechnung des Songtext-Status
 const calculateLyricsState = (
   lyricsDetails: IFoundLyrics,
   progressMs: number,
-  syncEnabled: boolean,
-  paused: boolean
+  syncEnabled: boolean
 ) => {
-  const progressSeconds = progressMs / 1000;
+  const synced = lyricsDetails.syncedLyrics;
 
-  // If there is no syncedLyricsArray or sync is disabled or the song is paused, return the plain lyrics
-  if (lyricsDetails.syncedLyrics === null || !syncEnabled || paused) {
+  // Wenn keine synchronisierten Lyrics vorhanden oder Sync deaktiviert ist
+  if (!synced || synced.length === 0 || !syncEnabled) {
     return {
       before: "",
       highlighted: "",
@@ -154,21 +155,32 @@ const calculateLyricsState = (
     };
   }
 
-  // Calculate the current lyric state based on progress
-  const passedLyricsAndCurrent =
-    lyricsDetails.syncedLyrics.filter(x => x.timestamp <= progressSeconds) ?? [];
-  const passedLyrics = passedLyricsAndCurrent.slice(0, -1);
-  const currentLyrics =
-    passedLyricsAndCurrent.length > 0
-      ? passedLyricsAndCurrent[passedLyricsAndCurrent.length - 1]
-      : null;
-  const upcomingLyrics = lyricsDetails.syncedLyrics.filter(x => x.timestamp > progressSeconds);
+  const progressSeconds = progressMs / 1000;
 
-  return {
-    before: passedLyrics.map(x => x.content).join(" \n "),
-    highlighted: currentLyrics?.content ?? "",
-    after: upcomingLyrics.map(x => x.content).join(" \n ")
-  };
+  // Finde den Index der aktuell aktiven Zeile (letztes Element mit timestamp <= progressSeconds)
+  let currentIndex = -1;
+  for (let i = 0; i < synced.length; i++) {
+    if (synced[i].timestamp <= progressSeconds) {
+      currentIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  if (currentIndex === -1) {
+    // Noch vor der ersten Zeile
+    return {
+      before: "",
+      highlighted: "",
+      after: synced.map(x => x.content).join(" \n ")
+    };
+  }
+
+  const before = synced.slice(0, currentIndex).map(x => x.content).join(" \n ");
+  const highlighted = synced[currentIndex]?.content ?? "";
+  const after = synced.slice(currentIndex + 1).map(x => x.content).join(" \n ");
+
+  return { before, highlighted, after };
 };
 
 const useStyles = makeStyles(theme => ({
