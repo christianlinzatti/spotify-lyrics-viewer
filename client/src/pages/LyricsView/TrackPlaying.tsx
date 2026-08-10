@@ -13,7 +13,7 @@ interface IProps {
 const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currentlyPlayingSong }) => {
   const artistName = currentlyPlayingSong?.currentlyPlayingObject?.item?.artists?.[0]?.name;
 
-  // No lyrics yet
+  // 1. Ladezustand: Noch keine Antwort vom Backend erhalten
   if (lyricDetails === undefined) {
     return (
       <Box textAlign="center">
@@ -22,8 +22,8 @@ const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currently
     );
   }
 
-  // No lyrics found
-  if (lyricDetails.lyrics === undefined) {
+  // 2. Keine Lyrics gefunden (lyricDetails.lyrics ist null oder undefined)
+  if (!lyricDetails.lyrics) {
     return (
       <Box textAlign="center">
         <Typography>No lyrics found for the current track.</Typography>
@@ -37,20 +37,26 @@ const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currently
     );
   }
 
-  // Lyrics miss
+  // 3. Lyrics-Objekt vorhanden, aber weder plainLyrics noch syncedLyrics enthalten Text
   const lyricsAreEmpty =
-    !lyricDetails?.lyrics?.plainLyrics &&
-    (!lyricDetails?.lyrics?.syncedLyrics || lyricDetails.lyrics.syncedLyrics.length === 0);
+    !lyricDetails.lyrics.plainLyrics &&
+    (!lyricDetails.lyrics.syncedLyrics || lyricDetails.lyrics.syncedLyrics.length === 0);
 
   if (lyricsAreEmpty) {
     return (
       <Box textAlign="center">
-        <Typography>No lyrics found for this track.</Typography>
+        <Typography>No lyrics available for this track.</Typography>
+        {artistName && (
+          <>
+            <Divider style={{ margin: "2rem 0" }} />
+            <ArtistInfo artistName={artistName} />
+          </>
+        )}
       </Box>
     );
   }
 
-  // Lyrics found
+  // 4. Lyrics erfolgreich geladen
   return (
     <Box>
       <LyricsDisplay
