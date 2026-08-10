@@ -1,8 +1,8 @@
-import { Box, CircularProgress, Typography, Divider } from "@material-ui/core";
+import { Box, CircularProgress, Divider, Typography } from "@material-ui/core";
 import React from "react";
+import ArtistInfo from "../../components/ArtistInfo";
 import { PlayingStatePaused, PlayingStatePlaying } from "../../types/currentlyPlayingState";
 import { ITrackLyrics } from "../../types/trackLyrics";
-import ArtistInfo from "../../components/ArtistInfo";
 import LyricsDisplay from "./LyricsDisplay";
 
 interface IProps {
@@ -39,15 +39,13 @@ const TrackPlaying: React.FunctionComponent<IProps> = ({ lyricDetails, currently
 
   // Lyrics miss
   const lyricsAreEmpty =
-    lyricDetails?.lyrics?.plainLyrics === undefined &&
-    (lyricDetails?.lyrics?.syncedLyrics ?? undefined) === undefined;
+    !lyricDetails?.lyrics?.plainLyrics &&
+    (!lyricDetails?.lyrics?.syncedLyrics || lyricDetails.lyrics.syncedLyrics.length === 0);
+
   if (lyricsAreEmpty) {
     return (
       <Box textAlign="center">
-        <Typography>No lyrics found. Trying again.</Typography>
-        <Box mt={1}>
-          <CircularProgress size={30} />
-        </Box>
+        <Typography>No lyrics found for this track.</Typography>
       </Box>
     );
   }
