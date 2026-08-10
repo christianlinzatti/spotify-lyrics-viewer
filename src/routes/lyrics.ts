@@ -3,12 +3,11 @@ import NodeCache from "node-cache";
 import { getLyrics as getLyricsFromGenius } from "../api/genius";
 import { getLyrics as getLyricsFromLrcLib } from "../api/lrclib";
 import config from "../config";
+import { IFoundLyrics } from "../dto";
 
 export const subRoute = "/api/lyrics";
-
 const router = express.Router();
 
-// Cache für Songtexte (TTL: 24 Stunden)
 const lyricsCache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 });
 
 interface LyricsQuery {
@@ -18,16 +17,6 @@ interface LyricsQuery {
   duration?: string;
 }
 
-export interface LyricsResponse {
-  lyrics: string;
-  synced: boolean;
-  source: "lrclib" | "genius";
-}
-
-/**
- * Entfernt Störbegriffe aus Songtiteln für eine höhere Trefferquote
- * z. B. "Song Title - Remastered 2020" -> "Song Title"
- */
 function cleanTrackTitle(title: string): string {
   return title
     .replace(/-\s*.*remastered.*/i, "")
@@ -41,7 +30,6 @@ router.get("/", async (req: Request<{}, {}, {}, LyricsQuery>, res: Response) => 
   try {
     const { artists, title, albumName, duration } = req.query;
 
-    // 1. Validierung der Query-Parameter
     if (!artists || !title || !albumName || !duration) {
       return res.status(400).json({
         error: "Please provide 'artists', 'title', 'albumName', and 'duration'"
@@ -58,70 +46,51 @@ router.get("/", async (req: Request<{}, {}, {}, LyricsQuery>, res: Response) => 
     const cleanedTitle = cleanTrackTitle(title);
     const mainArtist = artistArray[0] || "";
 
-    // 2. Cache Check (Key: Interpret + Titel)
     const cacheKey = `lyrics_${mainArtist.toLowerCase()}_${cleanedTitle.toLowerCase()}`;
-    const cachedLyrics = lyricsCache.get<LyricsResponse>(cacheKey);
+    const cachedLyrics = lyricsCache.get<IFoundLyrics>(cacheKey);
 
     if (cachedLyrics) {
       res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=43200");
       return res.json(cachedLyrics);
     }
 
-    let lyricsResult: LyricsResponse | null = null;
+    let lyricsResult: IFoundLyrics | null = null;
 
-    // 3. Versuch 1: LRCLIB (Liefert synchrone oder normale Lyrics)
+    // 1. LRCLIB Versuch
     try {
-      const lrclibData = await getLyricsFromLrcLib(
+      lyricsResult = await getLyricsFromLrcLib(
         artistArray,
         cleanedTitle,
         albumName,
         durationNum
       );
-
-      if (lrclibData) {
-        // Prüfen, ob synchrone (.lrc) oder normale Lyrics vorliegen
-        const isSynced = typeof lrclibData === "string" && /^\[\d{2}:\d{2}\.\d{2}\]/m.test(lrclibData);
-        lyricsResult = {
-          lyrics: lrclibData,
-          synced: isSynced,
-          source: "lrclib"
-        };
-      }
     } catch (err) {
       console.warn("LRCLIB fetch failed, trying fallback...", err);
     }
 
-    // 4. Versuch 2: Genius API Fallback (falls LRCLIB nichts findet)
+    // 2. Genius Fallback
     if (!lyricsResult && config.genius?.access_token) {
       try {
-        const geniusData = await getLyricsFromGenius(
+        lyricsResult = await getLyricsFromGenius(
           artistArray,
           cleanedTitle,
           albumName,
           durationNum,
           config.genius.access_token
         );
-
-        if (geniusData) {
-          lyricsResult = {
-            lyrics: geniusData,
-            synced: false,
-            source: "genius"
-          };
-        }
       } catch (err) {
         console.warn("Genius fetch failed:", err);
       }
     }
 
-    // 5. Ergebnis auswerten
     if (!lyricsResult) {
       return res.status(404).json({ error: "Unable to find lyrics" });
     }
 
-    // In Cache schreiben & Antwort senden
     lyricsCache.set(cacheKey, lyricsResult);
     res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=43200");
+
+    // Gibt direkt IFoundLyrics zurück (inkl. plainLyrics & syncedLyrics)
     return res.json(lyricsResult);
 
   } catch (error) {
