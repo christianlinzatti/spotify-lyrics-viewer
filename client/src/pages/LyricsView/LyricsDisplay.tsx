@@ -144,7 +144,10 @@ const calculateLyricsState = (
   progressMs: number,
   syncEnabled: boolean
 ) => {
-  const synced = lyricsDetails.syncedLyrics;
+  const synced = lyricsDetails.syncedLyrics as any[];
+
+  // Helper, um den Zeilentext unabhängig vom Key (text oder content) auszulesen
+  const getText = (line: any) => line?.text ?? line?.content ?? "";
 
   // Wenn keine synchronisierten Lyrics vorhanden oder Sync deaktiviert ist
   if (!synced || synced.length === 0 || !syncEnabled) {
@@ -157,7 +160,6 @@ const calculateLyricsState = (
 
   const progressSeconds = progressMs / 1000;
 
-  // Finde den Index der aktuell aktiven Zeile (letztes Element mit timestamp <= progressSeconds)
   let currentIndex = -1;
   for (let i = 0; i < synced.length; i++) {
     if (synced[i].timestamp <= progressSeconds) {
@@ -168,17 +170,16 @@ const calculateLyricsState = (
   }
 
   if (currentIndex === -1) {
-    // Noch vor der ersten Zeile
     return {
       before: "",
       highlighted: "",
-      after: synced.map(x => x.content).join(" \n ")
+      after: synced.map(getText).join(" \n ")
     };
   }
 
-  const before = synced.slice(0, currentIndex).map(x => x.content).join(" \n ");
-  const highlighted = synced[currentIndex]?.content ?? "";
-  const after = synced.slice(currentIndex + 1).map(x => x.content).join(" \n ");
+  const before = synced.slice(0, currentIndex).map(getText).join(" \n ");
+  const highlighted = getText(synced[currentIndex]);
+  const after = synced.slice(currentIndex + 1).map(getText).join(" \n ");
 
   return { before, highlighted, after };
 };
