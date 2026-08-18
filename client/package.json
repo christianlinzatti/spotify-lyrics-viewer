@@ -10,6 +10,7 @@
     "ajv": "^8.0.0",
     "ajv-keywords": "^5.0.0",
     "cogo-toast": "^4.2.3",
+    "cookie-session": "^2.1.1",
     "lrc-kit": "1.1.1",
     "mark.js": "^8.11.1",
     "node-cache": "^5.1.2",

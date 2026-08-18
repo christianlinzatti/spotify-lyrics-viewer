@@ -1,13 +1,12 @@
 import express from "express";
 import SpotifyWebApi from "spotify-web-api-node";
-import config from "../config";
-import { ITokenExpiryPair } from "../dto";
-import { randomString } from "../utils";
-import { isStoredTokenValid } from "../utils/spotify";
+import config from "./config";
+import { ITokenExpiryPair } from "./dto";
+import { randomString } from "./utils";
+import { isStoredTokenValid } from "./utils/spotify";
 
 export const subRoute = "/api/spotify";
 
-// Hilfsfunktion zur sicheren Bereinigung von Proxy-Headern
 const parseHeader = (header: string | string[] | undefined): string => {
   if (!header) return "";
   const raw = Array.isArray(header) ? header[0] : header;
@@ -36,28 +35,32 @@ const router = express.Router();
 const Config = config;
 
 async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPair> {
+  if (!req.session) {
+    throw new Error("No session available");
+  }
+
   const spotifyApi = new SpotifyWebApi({
     clientId: Config.spotify.client_id,
     clientSecret: Config.spotify.client_secret,
     redirectUri: getRedirectUri(req)
   });
 
-  spotifyApi.setAccessToken(req.session?.access_token);
-  spotifyApi.setRefreshToken(req.session?.refresh_token);
+  spotifyApi.setAccessToken(req.session.access_token);
+  spotifyApi.setRefreshToken(req.session.refresh_token);
 
   const refreshResponse = await spotifyApi.refreshAccessToken();
   const expiresAt = millisecondsOffsetFromNow(refreshResponse.body.expires_in);
 
-  req.session!.access_token = refreshResponse.body.access_token;
-  req.session!.expires_at = expiresAt;
+  req.session.access_token = refreshResponse.body.access_token;
+  req.session.expires_at = expiresAt;
 
   if (refreshResponse.body.refresh_token) {
-    req.session!.refresh_token = refreshResponse.body.refresh_token;
+    req.session.refresh_token = refreshResponse.body.refresh_token;
   }
 
   return {
-    access_token: req.session!.access_token,
-    expires_at: req.session!.expires_at
+    access_token: req.session.access_token,
+    expires_at: req.session.expires_at
   };
 }
 
@@ -91,7 +94,6 @@ router.get("/authenticate", (req, res) => {
 
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
 
-    // Schlanke Session-Variablen halten, um Cookie-Größe zu minimieren
     req.session.authentication_state = state;
     req.session.authentication_origin = origin;
     req.session.redirected_uri = redirectUri;
@@ -122,7 +124,6 @@ router.get("/authentication-callback", async (req, res) => {
 
   const redirectUri = req.session.redirected_uri || getRedirectUri(req);
 
-  // Temporäre Variablen SOFORT löschen, um Platz im Cookie zu sparen
   delete req.session.authentication_state;
   delete req.session.authentication_origin;
   delete req.session.redirected_uri;
@@ -136,12 +137,10 @@ router.get("/authentication-callback", async (req, res) => {
 
     const authorizationResponse = await spotifyApi.authorizationCodeGrant(code as string);
 
-    // Nur notwendige Daten speichern
     req.session.expires_at = millisecondsOffsetFromNow(authorizationResponse.body.expires_in);
     req.session.access_token = authorizationResponse.body.access_token;
     req.session.refresh_token = authorizationResponse.body.refresh_token;
 
-    // Sicheres URL-Formatting
     let targetUrl = requestOrigin;
     if (targetUrl.endsWith("/") && targetUrl.length > 1) {
       targetUrl = targetUrl.slice(0, -1);
