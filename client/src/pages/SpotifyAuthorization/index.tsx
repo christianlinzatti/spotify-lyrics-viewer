@@ -1,6 +1,6 @@
 import { Box, CircularProgress, Typography } from "@material-ui/core";
-import { navigate } from "hookrouter";
-import React from "react";
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Config from "../../config";
 
 interface IProps {
@@ -8,35 +8,39 @@ interface IProps {
 }
 
 const SpotifyAuthorization: React.FC<IProps> = ({ onNewToken }) => {
+  const navigate = useNavigate();
   const { search } = window.location;
+
+  const params = new URLSearchParams(search.substring(1));
+  const accessToken = params.get("access_token");
+  const expiresAt = params.get("expires_at");
+
+  useEffect(() => {
+    if (search === "") {
+      // Kein Token in der URL: Weiterleitung zur Spotify-Authentifizierung
+      window.location.href = Config.api.root + Config.api.spotify_authentication_route;
+    } else if (accessToken !== null && expiresAt !== null) {
+      // Token vorhanden: Speichern und zur Homepage navigieren
+      onNewToken(accessToken, parseInt(expiresAt, 10));
+      navigate("/", { replace: true });
+    }
+  }, [search, accessToken, expiresAt, onNewToken, navigate]);
 
   let message = <></>;
 
   if (search === "") {
-    // No token in URL, redirect user to request for one
-    window.location.href = Config.api.root + Config.api.spotify_authentication_route;
     message = (
       <>
         <Box mb={2}>
-          <Typography variant="subtitle1">Redirecting</Typography>
+          <Typography variant="subtitle1">Redirecting...</Typography>
         </Box>
         <CircularProgress size={30} />
       </>
     );
+  } else if (accessToken !== null && expiresAt !== null) {
+    message = <Typography variant="subtitle1">Token received</Typography>;
   } else {
-    // We have received the token, read it from the URL
-    const params = new URLSearchParams(search.substr(1));
-    const accessToken = params.get("access_token");
-    const expiresAt = params.get("expires_at");
-
-    if (accessToken !== null && expiresAt !== null) {
-      // All parameters are present
-      onNewToken(accessToken, parseInt(expiresAt, 10));
-      navigate("/");
-      message = <Typography variant="subtitle1">Token received</Typography>;
-    } else {
-      message = <Typography variant="subtitle1">Incorrect URL parameters</Typography>;
-    }
+    message = <Typography variant="subtitle1">Incorrect URL parameters</Typography>;
   }
 
   return (
@@ -44,7 +48,7 @@ const SpotifyAuthorization: React.FC<IProps> = ({ onNewToken }) => {
       <Typography variant="h4" align="center">
         Spotify Authorization
       </Typography>
-      <Box alignItems="center" textAlign="center">
+      <Box alignItems="center" textAlign="center" mt={2}>
         {message}
       </Box>
     </>

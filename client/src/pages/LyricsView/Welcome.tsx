@@ -1,9 +1,11 @@
 import { Avatar, Box, Button, Typography } from "@material-ui/core";
-import { navigate } from "hookrouter";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import SpotifyLogoRoundImage from "../../img/spotify-logo-round.png";
 
 const Welcome: React.FunctionComponent = () => {
+  const navigate = useNavigate();
+
   const onLoginButtonClicked = () => {
     navigate("/spotify-authorization");
   };

@@ -4,7 +4,7 @@ import {
   Box,
   Container,
   IconButton,
-  Link,
+  Link as MuiLink,
   Toolbar,
   Typography,
   makeStyles,
@@ -15,8 +15,8 @@ import AccountCircleIcon from "@material-ui/icons/AccountCircle";
 import DarkModeIcon from "@material-ui/icons/Brightness4";
 import LightModeIcon from "@material-ui/icons/Brightness7";
 import GitHubIcon from "@material-ui/icons/GitHub";
-import { navigate, usePath } from "hookrouter";
 import React from "react";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import BannerImageDark from "../img/banner-dark.png";
 import BannerImage from "../img/banner.png";
 import LogoImage from "../img/logo.png";
@@ -40,15 +40,11 @@ const Navigation: React.FunctionComponent<IProps> = ({
   isDarkMode
 }) => {
   const classes = useStyles();
-  const currentPath = usePath();
+  const location = useLocation();
+  const navigate = useNavigate();
   const theme = useTheme();
 
   const showFullLogo = useMediaQuery(theme.breakpoints.up("sm"));
-
-  const goTo = (location: string) => (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-    event.preventDefault();
-    navigate(location);
-  };
 
   const onUserIconClick = () => {
     if (user === null) {
@@ -65,7 +61,7 @@ const Navigation: React.FunctionComponent<IProps> = ({
     <AppBar position="static" className={classes.appBar}>
       <Container maxWidth="md">
         <Toolbar className={classes.toolbar}>
-          <Link href="/" onClick={goTo("/")}>
+          <MuiLink component={RouterLink} to="/">
             {showFullLogo ? (
               <img
                 src={isDarkMode ? BannerImageDark : BannerImage}
@@ -81,27 +77,27 @@ const Navigation: React.FunctionComponent<IProps> = ({
                 className={classes.logo}
               />
             )}
-          </Link>
+          </MuiLink>
 
           {Object.keys(navbarLinks).map(path => (
             <Box key={path} display="inline" ml={2}>
-              <Link
-                href={path}
-                onClick={goTo(path)}
-                className={`${classes.link} ${currentPath === path ? classes.activeLink : ""}`}
+              <MuiLink
+                component={RouterLink}
+                to={path}
+                className={`${classes.link} ${location.pathname === path ? classes.activeLink : ""}`}
               >
                 <Typography variant="body1">{navbarLinks[path]}</Typography>
-              </Link>
+              </MuiLink>
             </Box>
           ))}
 
           <div className={classes.grow} />
 
-          <Link href="https://github.com/brentvollebregt/spotify-lyrics-viewer">
+          <MuiLink href="https://github.com/brentvollebregt/spotify-lyrics-viewer" target="_blank" rel="noopener noreferrer">
             <IconButton>
               <GitHubIcon />
             </IconButton>
-          </Link>
+          </MuiLink>
 
           <IconButton onClick={onThemeToggle}>
             {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
@@ -155,7 +151,6 @@ const useStyles = makeStyles(theme => ({
     width: 30,
     height: 30
   },
-  // Utils
   grow: {
     flexGrow: 1
   }

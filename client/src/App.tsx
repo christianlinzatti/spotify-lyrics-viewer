@@ -1,11 +1,10 @@
 import { Box, Container, CssBaseline, ThemeProvider } from "@material-ui/core";
-import { setBasepath, useRedirect, useRoutes } from "hookrouter";
 import React, { useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { deleteSession, spotifyGetCurrentToken } from "./api";
 import MetaTags from "./components/MetaTags";
 import Navigation from "./components/Navigation";
 import Player from "./components/Player";
-import config from "./config";
 import useCurrentlyPlayingSong from "./hooks/useCurrentlyPlayingSong";
 import useLyrics from "./hooks/useLyrics";
 import useThemeState from "./hooks/useThemeState";
@@ -23,15 +22,11 @@ const App: React.FC = () => {
   const onNewToken = (accessToken: string, expiresAt: number) => {
     setToken({ expiry: new Date(expiresAt), value: accessToken } as IToken);
   };
+
   const clearToken = () => {
     setToken(null);
     deleteSession();
   };
-
-  if (config.client.basename !== undefined) {
-    // Needed when we have a subdirectory in the url to adjust the links on home, about, etc
-    setBasepath(config.client.basename);
-  }
 
   const user = useUser(token, clearToken);
   useTokenRefresh(token, onNewToken, clearToken);
@@ -48,30 +43,6 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const routes = {
-    "/": () => (
-      <MetaTags
-        route="/"
-        description="View the lyrics of the current song playing on your Spotify account in your browser."
-      >
-        <LyricsView user={user} currentlyPlayingSong={currentlyPlayingSong} lyrics={lyrics} />
-      </MetaTags>
-    ),
-    "/about": () => (
-      <MetaTags
-        route="/about"
-        titlePrefix="About - "
-        description="Spotify Lyrics Viewer is a tool that allows you to view the lyrics of the current playing song on Spotify."
-      >
-        <About />
-      </MetaTags>
-    ),
-    "/spotify-authorization": () => <SpotifyAuthorization onNewToken={onNewToken} />,
-    "/spotify-authorization/": () => <SpotifyAuthorization onNewToken={onNewToken} />
-  };
-  const routeResult = useRoutes(routes);
-  useRedirect("/about/", "/about");
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -84,7 +55,41 @@ const App: React.FC = () => {
         />
 
         <Box py={3} style={{ overflow: "auto" }}>
-          <Container maxWidth="md">{routeResult ?? <NotFound />}</Container>
+          <Container maxWidth="md">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <MetaTags
+                    route="/"
+                    description="View the lyrics of the current song playing on your Spotify account in your browser."
+                  >
+                    <LyricsView user={user} currentlyPlayingSong={currentlyPlayingSong} lyrics={lyrics} />
+                  </MetaTags>
+                }
+              />
+              <Route
+                path="/about"
+                element={
+                  <MetaTags
+                    route="/about"
+                    titlePrefix="About - "
+                    description="Spotify Lyrics Viewer is a tool that allows you to view the lyrics of the current playing song on Spotify."
+                  >
+                    <About />
+                  </MetaTags>
+                }
+              />
+              {/* Redirect für Trailing Slash (/about/ -> /about) */}
+              <Route path="/about/" element={<Navigate to="/about" replace />} />
+
+              <Route path="/spotify-authorization" element={<SpotifyAuthorization onNewToken={onNewToken} />} />
+              <Route path="/spotify-authorization/" element={<SpotifyAuthorization onNewToken={onNewToken} />} />
+
+              {/* Catch-All für 404 Not Found */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Container>
         </Box>
 
         <Player currentlyPlayingSong={currentlyPlayingSong} token={token} />
