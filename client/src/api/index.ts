@@ -1,17 +1,26 @@
-import { IFoundLyrics, ITokenExpiryPair } from "../../../src/dto";
+// C:\Users\Christian\spotify-lyics-viewer\spotify-lyrics-viewer\src\api\index.ts
+
+import { IFoundLyrics, ITokenExpiryPair } from "../dto"; // Pfad angepasst
 import Config from "../config";
 
-getLyrics(artists, title, albumName, duration)
-  .then(data => {
-    if (data) {
-      // Wenn die API direkt IFoundLyrics zurückgibt:
-      const lyricsObj = "lyrics" in data ? (data as any).lyrics : data;
-      setLyrics({ lyrics: lyricsObj });
-    } else {
-      setLyrics({ lyrics: null });
-    }
-  })
-  .catch(() => setLyrics({ lyrics: null }));
+export function getLyrics(
+  artists: string[],
+  title: string,
+  albumName: string,
+  duration: number
+): Promise<IFoundLyrics | null> {
+  const parameters = new URLSearchParams();
+  parameters.append("title", title);
+  for (const artist of artists) {
+    parameters.append("artists", artist);
+  }
+  parameters.append("albumName", albumName);
+  parameters.append("duration", duration.toString());
+
+  return fetch(`${Config.api.root}/api/lyrics?${parameters}`).then(r =>
+    r.status === 200 ? r.json() : null
+  );
+}
 
 export function spotifyGetCurrentToken(): Promise<ITokenExpiryPair | null> {
   return fetch(`${Config.api.root}/api/spotify/token`, {
