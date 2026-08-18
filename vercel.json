@@ -1,5 +1,29 @@
 {
-  "buildCommand": "cd client && npm install --legacy-peer-deps && npm run build",
-  "outputDirectory": "client/build",
-  "framework": "create-react-app"
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "src/index.ts"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "client/index.html"
+    }
+  ]
 }
