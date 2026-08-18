@@ -1,34 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "src/index.ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "src/index.ts"
-    },
-    {
-      "src": "/static/(.*)",
-      "dest": "client/static/$1"
-    },
-    {
-      "src": "/(.*\\.(js|css|json|png|jpg|jpeg|svg|ico|woff|woff2|map))",
-      "dest": "client/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "client/index.html"
-    }
-  ]
+  "buildCommand": "cd client && npm install --legacy-peer-deps && npm run build",
+  "outputDirectory": "client/build",
+  "framework": "create-react-app"
 }
