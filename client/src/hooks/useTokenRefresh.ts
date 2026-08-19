@@ -22,7 +22,7 @@ const useTokenRefresh = (
         setTimeout(() => {
           spotifyRefreshToken().then(newToken => {
             if (newToken !== null) {
-              onNewToken(newToken.access_token, newToken.expires_at);
+              onNewToken(newToken.accessToken, newToken.expiresAt);
             } else {
               const { hide } = cogoToast.warn(
                 "Unable to keep logged into Spotify. Please log back in.",

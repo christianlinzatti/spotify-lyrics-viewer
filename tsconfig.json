@@ -1,17 +1,27 @@
 {
   "compilerOptions": {
+    "target": "ES2022",
     "module": "commonjs",
-    "esModuleInterop": true,
-    "target": "es6",
-    "noImplicitAny": true,
     "moduleResolution": "node",
-    "strict": true,
-    "sourceMap": true,
+    "rootDir": "./src",
     "outDir": "build",
-    "baseUrl": ".",
-    "paths": {
-      "*": ["node_modules/*"]
-    }
+    "esModuleInterop": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "ignoreDeprecations": "6.0",
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "build"
+  ]
 }

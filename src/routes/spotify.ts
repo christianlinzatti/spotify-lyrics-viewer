@@ -2,6 +2,7 @@ import express from "express";
 import SpotifyWebApi from "spotify-web-api-node";
 import config from "../config";
 import { ITokenExpiryPair } from "../dto";
+import "../types/express"; // 👈 ZWINGT TypeScript dazu, die Typen zu laden!
 import { randomString } from "../utils";
 import { isStoredTokenValid } from "../utils/spotify";
 
@@ -37,6 +38,11 @@ const Config = config;
  * Hilfsfunktion zum Erneuern des Access-Tokens
  */
 async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPair> {
+  // 1. Session & Token Guard Clause
+  if (!req.session || !req.session.access_token || !req.session.refresh_token) {
+    throw new Error("No active session or refresh token available");
+  }
+
   const spotifyApi = new SpotifyWebApi({
     clientId: Config.spotify.client_id,
     clientSecret: Config.spotify.client_secret,
@@ -52,14 +58,16 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
   req.session.access_token = refreshResponse.body.access_token;
   req.session.expires_at = expiresAt;
 
-  // Falls Spotify ein neues Refresh Token mitliefert
-  if (refreshResponse.body.refresh_token) {
-    req.session.refresh_token = refreshResponse.body.refresh_token;
+  // Type-Assertion für optionales refresh_token aus der API-Response
+  const responseBody = refreshResponse.body as typeof refreshResponse.body & { refresh_token?: string };
+  if (responseBody.refresh_token) {
+    req.session.refresh_token = responseBody.refresh_token;
   }
 
+  // Rückgabe im camelCase-Format (gemäß deinem ITokenExpiryPair Interface)
   return {
-    access_token: req.session.access_token,
-    expires_at: req.session.expires_at
+    accessToken: req.session.access_token,
+    expiresAt: req.session.expires_at
   };
 }
 
@@ -153,7 +161,7 @@ router.get("/authentication-callback", async (req, res) => {
     });
 
     const authorizationResponse = await spotifyApi.authorizationCodeGrant(code as string);
-    
+
     req.session.expires_at = millisecondsOffsetFromNow(authorizationResponse.body.expires_in);
     req.session.access_token = authorizationResponse.body.access_token;
     req.session.refresh_token = authorizationResponse.body.refresh_token;
@@ -182,8 +190,8 @@ router.get("/token", async (req, res) => {
   }
 
   const now = Date.now();
+  // Nutzt 0 als Fallback, damit expiresAt garantiert vom Typ 'number' ist
   const expiresAt = req.session.expires_at || 0;
-  // Auto-Refresh, wenn das Token in unter 60 Sekunden abläuft
   const isExpiringSoon = expiresAt - now < 60000;
 
   if (isExpiringSoon || !isStoredTokenValid(req)) {
@@ -195,9 +203,10 @@ router.get("/token", async (req, res) => {
     }
   }
 
+  // Hier 'expiresAt' statt 'req.session.expires_at' verwenden:
   const responseData: ITokenExpiryPair = {
-    access_token: req.session.access_token,
-    expires_at: req.session.expires_at
+    accessToken: req.session.access_token,
+    expiresAt: expiresAt
   };
 
   return res.json(responseData);
@@ -210,7 +219,6 @@ router.get("/token", async (req, res) => {
 router.get("/refresh-token", async (req, res) => {
   if (!req.session) throw new Error("Session has not been set");
 
-  // FIX: Prüft nun auf refresh_token anstelle des abgelaufenen access_tokens!
   if (!req.session.refresh_token) {
     return res.status(401).json({ error: "No refresh token available in session" });
   }

@@ -45,8 +45,8 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
     redirectUri: getRedirectUri(req)
   });
 
-  spotifyApi.setAccessToken(req.session.access_token);
-  spotifyApi.setRefreshToken(req.session.refresh_token);
+  spotifyApi.setAccessToken(req.session.access_token || "");
+  spotifyApi.setRefreshToken(req.session.refresh_token || "");
 
   const refreshResponse = await spotifyApi.refreshAccessToken();
   const expiresAt = millisecondsOffsetFromNow(refreshResponse.body.expires_in);
@@ -54,13 +54,15 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
   req.session.access_token = refreshResponse.body.access_token;
   req.session.expires_at = expiresAt;
 
-  if (refreshResponse.body.refresh_token) {
-    req.session.refresh_token = refreshResponse.body.refresh_token;
+  // Typ-Cast, da 'refresh_token' im SpotifyWebApi-Typ fehlt
+  const responseBody = refreshResponse.body as { refresh_token?: string };
+  if (responseBody.refresh_token) {
+    req.session.refresh_token = responseBody.refresh_token;
   }
 
   return {
-    access_token: req.session.access_token,
-    expires_at: req.session.expires_at
+    accessToken: req.session.access_token || "",
+    expiresAt: req.session.expires_at || 0
   };
 }
 

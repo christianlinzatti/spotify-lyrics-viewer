@@ -6,17 +6,19 @@ import Config from "../config";
 
 export const subRoute = "/api/artist";
 
-interface AlbumInfo {
+// --- Interfaces ---
+
+export interface AlbumInfo {
   name: string;
   url?: string;
   image?: string;
   playcount?: number;
 }
 
-interface ArtistInfo {
+export interface ArtistInfo {
   name: string;
   url?: string;
-  image: string; // Immer garantiert ein String
+  image: string;
   bio?: string;
   tags?: string[];
   listeners?: string;
@@ -34,15 +36,36 @@ interface ArtistInfo {
   }>;
 }
 
+// Minimal-Typen für Last.fm API
+interface LastFmImage {
+  "#text": string;
+  size: string;
+}
+
+interface LastFmTag {
+  name: string;
+  url: string;
+}
+
 const router = Router();
-const LASTFM_URL = "https://ws.audioscrobbler.com/2.0/";
 
-// In-Memory Cache für 1 Stunde (TTL)
+// --- Caches & Clients ---
+
+// Cache für komplette Künstler-Infos (1 Stunde)
 const artistCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
+// Eigener Cache für aufgelöste Bilder (24 Stunden), um Spotify API-Calls zu minimieren
+const imageCache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 });
 
-// Wiederverwendbarer Spotify Client mit Token-Management
+// Vorkonfigurierter Axios Client für Last.fm (DRY)
+const lastFmClient = axios.create({
+  baseURL: "https://ws.audioscrobbler.com/2.0/",
+  timeout: 5000
+});
+
+// Spotify Singleton & Token Refresh Promise (verhindert Race Conditions)
 let spotifyApiInstance: SpotifyWebApi | null = null;
 let spotifyTokenExpiresAt = 0;
+let tokenRefreshPromise: Promise<void> | null = null;
 
 async function getSpotifyClient(): Promise<SpotifyWebApi | null> {
   if (!Config.spotify?.client_id || !Config.spotify?.client_secret) {
@@ -57,24 +80,39 @@ async function getSpotifyClient(): Promise<SpotifyWebApi | null> {
   }
 
   const now = Date.now();
+  // Token vor Ablauf (60s Puffer) erneuern
   if (now >= spotifyTokenExpiresAt - 60000) {
-    try {
-      const grant = await spotifyApiInstance.clientCredentialsGrant();
-      spotifyApiInstance.setAccessToken(grant.body.access_token);
-      spotifyTokenExpiresAt = now + grant.body.expires_in * 1000;
-    } catch (err) {
-      console.error("Failed to refresh Spotify client credentials token:", err);
-      return null;
+    // Falls bereits eine Token-Anfrage läuft, warten wir auf dieselbe
+    if (!tokenRefreshPromise) {
+      tokenRefreshPromise = spotifyApiInstance
+        .clientCredentialsGrant()
+        .then((grant) => {
+          spotifyApiInstance?.setAccessToken(grant.body.access_token);
+          spotifyTokenExpiresAt = Date.now() + grant.body.expires_in * 1000;
+        })
+        .catch((err) => {
+          console.error("Failed to refresh Spotify client credentials token:", err);
+        })
+        .finally(() => {
+          tokenRefreshPromise = null;
+        });
     }
+    await tokenRefreshPromise;
   }
 
   return spotifyApiInstance;
 }
 
+// --- Hilfsfunktionen ---
+
 /**
- * Durchsucht Spotify nach einem Künstlerbild (prüft bis zu 5 Treffer)
+ * Durchsucht Spotify nach einem Künstlerbild mit Cache-Support
  */
 async function fetchSpotifyArtistImage(artistName: string): Promise<string | undefined> {
+  const cacheKey = `spotify_img_${artistName.toLowerCase()}`;
+  const cachedImg = imageCache.get<string>(cacheKey);
+  if (cachedImg !== undefined) return cachedImg;
+
   try {
     const spotifyApi = await getSpotifyClient();
     if (!spotifyApi) return undefined;
@@ -84,15 +122,16 @@ async function fetchSpotifyArtistImage(artistName: string): Promise<string | und
 
     if (!artists || artists.length === 0) return undefined;
 
-    // 1. Priorität: Exakte Namensübereinstimmung mit Bild
     const exactMatch = artists.find(
       (a) => a.name.toLowerCase() === artistName.toLowerCase() && a.images && a.images.length > 0
     );
-    if (exactMatch) return exactMatch.images[0].url;
 
-    // 2. Priorität: Erster Treffer mit gültigem Bild
-    const firstWithImage = artists.find((a) => a.images && a.images.length > 0);
-    if (firstWithImage) return firstWithImage.images[0].url;
+    const imageUrl = exactMatch ? exactMatch.images[0].url : artists.find((a) => a.images?.length > 0)?.images[0].url;
+
+    if (imageUrl) {
+      imageCache.set(cacheKey, imageUrl);
+      return imageUrl;
+    }
   } catch (error) {
     console.error(`Spotify image search error for ${artistName}:`, error);
   }
@@ -100,42 +139,31 @@ async function fetchSpotifyArtistImage(artistName: string): Promise<string | und
   return undefined;
 }
 
-/**
- * Generiert ein garantiertes Fallback-Bild basierend auf den Initialen des Künstlers
- */
-function generateInitialsAvatar(artistName: string): string {
-  const encodedName = encodeURIComponent(artistName);
-  return `https://ui-avatars.com/api/?name=${encodedName}&size=512&background=1DB954&color=ffffff&bold=true&font-size=0.33`;
+function generateInitialsAvatar(name: string): string {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=512&background=1DB954&color=ffffff&bold=true&font-size=0.33`;
 }
 
-/**
- * Ermittelt das beste Bild aus Last.fm, Spotify oder dem Avatar-Generator
- */
-async function resolveArtistImage(artistName: string, lastFmImages?: any[]): Promise<string> {
+async function resolveArtistImage(artistName: string, lastFmImages?: LastFmImage[]): Promise<string> {
   // 1. Last.fm Bild prüfen
   if (lastFmImages && lastFmImages.length > 0) {
     const largestImage = lastFmImages[lastFmImages.length - 1];
-    if (
-      largestImage["#text"] &&
-      !largestImage["#text"].includes("2a96cbd8b46e442fc41c2b86b821562f") // Generischer Last.fm-Star
-    ) {
-      return largestImage["#text"];
+    const url = largestImage["#text"];
+    if (url && !url.includes("2a96cbd8b46e442fc41c2b86b821562f")) {
+      return url;
     }
   }
 
-  // 2. Spotify API Bildsuche
+  // 2. Spotify API Bildsuche (gecached)
   const spotifyImage = await fetchSpotifyArtistImage(artistName);
-  if (spotifyImage) {
-    return spotifyImage;
-  }
+  if (spotifyImage) return spotifyImage;
 
-  // 3. Garantiertes Avatar-Bild
+  // 3. Fallback Avatar
   return generateInitialsAvatar(artistName);
 }
 
 function cleanBioText(text: string): string {
   return text
-    .replace(/<a href="https:\/\/www.last.fm\/[^"]+">Read more on Last.fm<\/a>\.?/gi, "")
+    .replace(/<a href="https:\/\/www\.last\.fm\/[^"]+">Read more on Last\.fm<\/a>\.?/gi, "")
     .replace(/<[^>]*>/g, "")
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, "&")
@@ -145,19 +173,22 @@ function cleanBioText(text: string): string {
     .trim();
 }
 
-/**
- * GET /api/artist/:artistName
- */
+// --- Route Handler ---
+
 router.get("/:artistName", async (req, res) => {
   try {
-    const rawArtistName = req.params.artistName;
-    const artistName = decodeURIComponent(rawArtistName).trim();
+    // Express dekodiert Params bereits. Fallback bei ungültigen Zeichen.
+    let artistName = req.params.artistName;
+    try {
+      artistName = decodeURIComponent(artistName).trim();
+    } catch {
+      artistName = artistName.trim();
+    }
 
     if (!Config.lastfm.api_key) {
       return res.status(400).json({ error: "Last.fm API key not configured" });
     }
 
-    // Cache-Check
     const cacheKey = `artist_${artistName.toLowerCase()}`;
     const cachedArtist = artistCache.get<ArtistInfo>(cacheKey);
     if (cachedArtist) {
@@ -169,24 +200,14 @@ router.get("/:artistName", async (req, res) => {
     const acceptLanguage = req.headers["accept-language"] || "";
     const lang = acceptLanguage.toLowerCase().includes("de") ? "de" : "en";
 
-    // Parallele Anfragen an Last.fm
+    // Parallele Last.fm Requests mit zentralem Client
+    const defaultParams = { api_key: apiKey, format: "json", artist: artistName };
+
     const [infoResult, tracksResult, similarResult, albumsResult] = await Promise.allSettled([
-      axios.get(LASTFM_URL, {
-        params: { method: "artist.getinfo", artist: artistName, api_key: apiKey, lang, format: "json" },
-        timeout: 5000
-      }),
-      axios.get(LASTFM_URL, {
-        params: { method: "artist.gettoptracks", artist: artistName, limit: 5, api_key: apiKey, format: "json" },
-        timeout: 5000
-      }),
-      axios.get(LASTFM_URL, {
-        params: { method: "artist.getsimilar", artist: artistName, limit: 6, api_key: apiKey, format: "json" },
-        timeout: 5000
-      }),
-      axios.get(LASTFM_URL, {
-        params: { method: "artist.gettopalbums", artist: artistName, limit: 6, api_key: apiKey, format: "json" },
-        timeout: 5000
-      })
+      lastFmClient.get("", { params: { ...defaultParams, method: "artist.getinfo", lang } }),
+      lastFmClient.get("", { params: { ...defaultParams, method: "artist.gettoptracks", limit: 5 } }),
+      lastFmClient.get("", { params: { ...defaultParams, method: "artist.getsimilar", limit: 6 } }),
+      lastFmClient.get("", { params: { ...defaultParams, method: "artist.gettopalbums", limit: 6 } })
     ]);
 
     if (
@@ -198,8 +219,6 @@ router.get("/:artistName", async (req, res) => {
     }
 
     const artist = infoResult.value.data.artist;
-
-    // Bild für Hauptkünstler auflösen
     const mainArtistImage = await resolveArtistImage(artist.name || artistName, artist.image);
 
     const artistInfo: ArtistInfo = {
@@ -210,17 +229,14 @@ router.get("/:artistName", async (req, res) => {
       playcount: artist.stats?.playcount
     };
 
-    // Bio säubern
     if (artist.bio?.summary) {
       artistInfo.bio = cleanBioText(artist.bio.summary);
     }
 
-    // Genres / Tags
-    if (artist.tags?.tag && Array.isArray(artist.tags.tag)) {
-      artistInfo.tags = artist.tags.tag.map((t: any) => t.name);
+    if (Array.isArray(artist.tags?.tag)) {
+      artistInfo.tags = artist.tags.tag.map((t: LastFmTag) => t.name);
     }
 
-    // Top Tracks
     if (tracksResult.status === "fulfilled" && tracksResult.value.data.toptracks?.track) {
       artistInfo.topTracks = tracksResult.value.data.toptracks.track.map((track: any) => ({
         name: track.name,
@@ -229,13 +245,9 @@ router.get("/:artistName", async (req, res) => {
       }));
     }
 
-    // Top Alben
     if (albumsResult.status === "fulfilled" && albumsResult.value.data.topalbums?.album) {
       artistInfo.topAlbums = albumsResult.value.data.topalbums.album.map((album: any) => {
-        let albumImg = "";
-        if (album.image && album.image.length > 0) {
-          albumImg = album.image[album.image.length - 1]["#text"] || "";
-        }
+        const albumImg = album.image?.[album.image.length - 1]?.["#text"];
         return {
           name: album.name,
           url: album.url,
@@ -245,12 +257,11 @@ router.get("/:artistName", async (req, res) => {
       });
     }
 
-    // Ähnliche Künstler (Parallele Bild-Auflösung für jeden ähnlichen Künstler)
     if (similarResult.status === "fulfilled" && similarResult.value.data.similarartists?.artist) {
       const rawSimilar = similarResult.value.data.similarartists.artist.slice(0, 6);
 
       artistInfo.similarArtists = await Promise.all(
-        rawSimilar.map(async (similarArtist: any) => {
+        rawSimilar.map(async (similarArtist: { name: string; url?: string; image?: LastFmImage[] }) => {
           const image = await resolveArtistImage(similarArtist.name, similarArtist.image);
           return {
             name: similarArtist.name,
@@ -261,16 +272,13 @@ router.get("/:artistName", async (req, res) => {
       );
     }
 
-    // In Cache schreiben
     artistCache.set(cacheKey, artistInfo);
 
     res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=43200");
     return res.json(artistInfo);
   } catch (error) {
     console.error("Error fetching artist info:", error);
-    return res.status(500).json({
-      error: "Failed to fetch artist information"
-    });
+    return res.status(500).json({ error: "Failed to fetch artist information" });
   }
 });
 

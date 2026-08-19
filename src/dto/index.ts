@@ -1,8 +1,8 @@
 import { Lyric } from "lrc-kit";
 
 export interface ITokenExpiryPair {
-  access_token: string;
-  expires_at: number;
+  accessToken: string;
+  expiresAt: number;
 }
 
 export interface IFoundLyrics {

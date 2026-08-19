@@ -1,5 +1,5 @@
 import { Box, Container, CssBaseline, ThemeProvider } from "@material-ui/core";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { deleteSession, spotifyGetCurrentToken } from "./api";
 import MetaTags from "./components/MetaTags";
@@ -19,14 +19,15 @@ import { IToken } from "./types/token";
 const App: React.FC = () => {
   const [token, setToken] = useState<IToken | null>(null);
 
-  const onNewToken = (accessToken: string, expiresAt: number) => {
+  // useCallback verhindert unnötige Re-Renders in Kindern
+  const onNewToken = useCallback((accessToken: string, expiresAt: number) => {
     setToken({ expiry: new Date(expiresAt), value: accessToken } as IToken);
-  };
+  }, []);
 
-  const clearToken = () => {
+  const clearToken = useCallback(() => {
     setToken(null);
     deleteSession();
-  };
+  }, []);
 
   const user = useUser(token, clearToken);
   useTokenRefresh(token, onNewToken, clearToken);
@@ -34,14 +35,18 @@ const App: React.FC = () => {
   const lyrics = useLyrics(currentlyPlayingSong);
   const { theme, toggleTheme, darkModeEnabled } = useThemeState();
 
-  // Request for a token on load to see if data is already in the state
+  // Token beim ersten Laden der Seite abfragen
   useEffect(() => {
     spotifyGetCurrentToken().then(newToken => {
       if (newToken !== null) {
-        onNewToken(newToken.access_token, newToken.expires_at);
+        onNewToken(newToken.accessToken, newToken.expiresAt);
+      } else {
+        setToken(null);
       }
+    }).catch(() => {
+      setToken(null);
     });
-  }, []);
+  }, [onNewToken]);
 
   return (
     <ThemeProvider theme={theme}>
