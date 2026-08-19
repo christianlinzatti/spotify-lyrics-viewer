@@ -26,7 +26,7 @@ function cleanTrackTitle(title: string): string {
     .trim();
 }
 
-router.get("/", async (req: Request<{}, {}, {}, LyricsQuery>, res: Response) => {
+router.get("/", async (req: express.Request, res: Response) => {
   try {
     const { artists, title, albumName, duration } = req.query;
 
