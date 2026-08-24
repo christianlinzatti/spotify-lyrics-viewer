@@ -124,19 +124,14 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
       expiresAt: req.session.expires_at
     };
   } catch (error) {
-    // Token ungültig oder vom User widerrufen -> Session aufräumen
     clearSpotifySession(req);
     await saveSession(req);
     throw error;
   }
 }
 
-// --- ROUTEN ---
+// --- ROUTEN DEFINIREN ---
 
-/**
- * GET /api/spotify/authenticate
- * Startet den OAuth 2.0 Flow
- */
 router.get("/authenticate", async (req, res) => {
   if (!req.session) {
     console.error("Express session middleware is missing or not configured correctly.");
@@ -173,7 +168,6 @@ router.get("/authenticate", async (req, res) => {
     req.session.authentication_origin = origin;
     req.session.redirected_uri = redirectUri;
 
-    // Erst nach erfolgreichem Speichern der Session weiterleiten
     await saveSession(req);
     return res.redirect(authorizeURL);
   } catch (error) {
@@ -182,10 +176,6 @@ router.get("/authenticate", async (req, res) => {
   }
 });
 
-/**
- * GET /api/spotify/authentication-callback
- * Empfängt den Auth-Code von Spotify
- */
 router.get("/authentication-callback", async (req, res) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
@@ -196,9 +186,8 @@ router.get("/authentication-callback", async (req, res) => {
   const { code, state, error } = req.query;
 
   const redirectUri = req.session.redirected_uri || getRedirectUri(req);
-  const savedState = req.session.authentication_state; // 1. State VOR dem Löschen sichern!
+  const savedState = req.session.authentication_state;
 
-  // 2. Verwendete OAuth-Variablen aufräumen
   delete req.session.authentication_state;
   delete req.session.authentication_origin;
   delete req.session.redirected_uri;
@@ -209,7 +198,6 @@ router.get("/authentication-callback", async (req, res) => {
     return res.redirect(`${requestOrigin}?error=access_denied`);
   }
 
-  // 3. Mit dem gesicherten savedState vergleichen
   if (!state || typeof state !== "string" || state !== savedState) {
     console.error("Unexpected or mismatched state value in OAuth callback");
     await saveSession(req);
@@ -259,10 +247,6 @@ router.get("/authentication-callback", async (req, res) => {
   }
 });
 
-/**
- * GET /api/spotify/token
- * Liefert das aktuelle Token & führt bei Bedarf einen Auto-Refresh durch
- */
 router.get("/token", async (req, res) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
@@ -274,7 +258,7 @@ router.get("/token", async (req, res) => {
 
   const now = Date.now();
   const expiresAt = req.session.expires_at || 0;
-  const isExpiringSoon = expiresAt - now < 60000; // < 60 Sekunden Restzeit
+  const isExpiringSoon = expiresAt - now < 60000;
 
   if (isExpiringSoon || !isStoredTokenValid(req)) {
     try {
@@ -293,10 +277,6 @@ router.get("/token", async (req, res) => {
   return res.json(responseData);
 });
 
-/**
- * GET /api/spotify/refresh-token
- * Manueller Token-Refresh
- */
 router.get("/refresh-token", async (req, res) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
@@ -315,10 +295,6 @@ router.get("/refresh-token", async (req, res) => {
   }
 });
 
-/**
- * POST /api/spotify/logout
- * Entfernt Spotify-Tokens aus der Session
- */
 router.post("/logout", async (req, res) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
@@ -330,4 +306,13 @@ router.post("/logout", async (req, res) => {
   return res.json({ success: true, message: "Logged out from Spotify" });
 });
 
-export default router;
+// --- EXPRESS APP INIZIALISIEREN & EXPORTIEREN (ERST NACH ALLEN ROUTEN!) ---
+
+const app = express();
+
+// Falls der Pfad /api/spotify in der Request-URL vorhanden ist:
+app.use(subRoute, router);
+// Falls Vercel den Prefix bereits abgeschnitten hat:
+app.use("/", router);
+
+export default app;
