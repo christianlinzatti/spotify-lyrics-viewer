@@ -1,17 +1,24 @@
-import { Dictionary, Request } from "express-serve-static-core";
+import { Request } from "express";
 
-export function isStoredTokenValid(req: Request<Dictionary<string>>): boolean {
-  if (req.session === null) throw new Error("Session has not been set");
-
-  if (!("access_token" in req.session) || !("expires_at" in req.session)) {
-    return false; // Not stored
+export function isStoredTokenValid(req: Request): boolean {
+  // 1. Sichere Prüfung: Ist req.session vorhanden?
+  if (!req.session) {
+    return false;
   }
 
-  if (new Date(req.session.expires_at) < new Date()) {
-    req.session.access_token = undefined;
-    req.session.expires_at = undefined;
-    req.session.refresh_token = undefined;
-    return false; // Expired
+  const { access_token, expires_at } = req.session;
+
+  // 2. Prüfen, ob die Token-Daten existieren
+  if (!access_token || !expires_at) {
+    return false;
+  }
+
+  // 3. Prüfen, ob das Token abgelaufen ist
+  if (new Date(expires_at).getTime() < Date.now()) {
+    delete req.session.access_token;
+    delete req.session.expires_at;
+    delete req.session.refresh_token;
+    return false;
   }
 
   return true;
