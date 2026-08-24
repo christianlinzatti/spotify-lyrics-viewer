@@ -196,8 +196,9 @@ router.get("/authentication-callback", async (req, res) => {
   const { code, state, error } = req.query;
 
   const redirectUri = req.session.redirected_uri || getRedirectUri(req);
+  const savedState = req.session.authentication_state; // 1. State VOR dem Löschen sichern!
 
-  // Verwendete OAuth-Variablen aufräumen
+  // 2. Verwendete OAuth-Variablen aufräumen
   delete req.session.authentication_state;
   delete req.session.authentication_origin;
   delete req.session.redirected_uri;
@@ -208,7 +209,8 @@ router.get("/authentication-callback", async (req, res) => {
     return res.redirect(`${requestOrigin}?error=access_denied`);
   }
 
-  if (!state || typeof state !== "string" || state !== req.session.authentication_state) {
+  // 3. Mit dem gesicherten savedState vergleichen
+  if (!state || typeof state !== "string" || state !== savedState) {
     console.error("Unexpected or mismatched state value in OAuth callback");
     await saveSession(req);
     return res.redirect(`${requestOrigin}?error=state_mismatch`);
@@ -232,7 +234,6 @@ router.get("/authentication-callback", async (req, res) => {
     req.session.access_token = authorizationResponse.body.access_token;
     req.session.refresh_token = authorizationResponse.body.refresh_token;
 
-    // Erstelle Ziel-URL absolut & sicher via URL-API
     let targetUrl: string;
     try {
       const baseUrl = requestOrigin.startsWith("http")
