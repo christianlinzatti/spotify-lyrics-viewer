@@ -310,9 +310,15 @@ router.post("/logout", async (req, res) => {
 
 const app = express();
 
-// Falls der Pfad /api/spotify in der Request-URL vorhanden ist:
 app.use(subRoute, router);
-// Falls Vercel den Prefix bereits abgeschnitten hat:
 app.use("/", router);
 
-export default app;
+// EXPORTIEREN ALS VERCEL HANDLER (löst das 'apply' Problem)
+export default function handler(req: any, res: any) {
+  return app(req, res, (err?: any) => {
+    if (err) {
+      console.error("Express Unhandled Error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+}
