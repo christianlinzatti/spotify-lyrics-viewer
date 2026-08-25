@@ -99,4 +99,11 @@ router.get("/", async (req: express.Request, res: Response) => {
   }
 });
 
-export default router;
+export default function handler(req: any, res: any) {
+  return router(req, res, (err?: any) => {
+    if (err) {
+      console.error("Index Router Error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+}
