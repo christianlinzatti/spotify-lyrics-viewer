@@ -1,20 +1,20 @@
-import green from "@material-ui/core/colors/green";
-import { createMuiTheme } from "@material-ui/core/styles";
+import green from "@mui/material/colors/green";
+import { createTheme } from "@mui/material/styles";
 
 const getTheme = (isDark: boolean) => {
   if (isDark) {
-    return createMuiTheme({
+    return createTheme({
       palette: {
-        type: "dark",
+        mode: "dark",
         primary: {
           main: green[500]
         }
       }
     });
   } else {
-    return createMuiTheme({
+    return createTheme({
       palette: {
-        type: "light",
+        mode: "light",
         primary: {
           main: green[800]
         }

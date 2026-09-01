@@ -1,8 +1,9 @@
-import { AppBar, Box, Container, Slider, makeStyles } from "@material-ui/core";
-import PauseCircleFilledIcon from "@material-ui/icons/PauseCircleFilled";
-import PlayCircleFilledIcon from "@material-ui/icons/PlayCircleFilled";
-import SkipNextIcon from "@material-ui/icons/SkipNext";
-import SkipPreviousIcon from "@material-ui/icons/SkipPrevious";
+import { AppBar, Box, Container, Slider } from "@mui/material";
+import { makeStyles } from "@mui/styles";
+import PauseCircleFilledIcon from "@mui/icons-material/PauseCircleFilled";
+import PlayCircleFilledIcon from "@mui/icons-material/PlayCircleFilled";
+import SkipNextIcon from "@mui/icons-material/SkipNext";
+import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
 import React from "react";
 import SpotifyWebApi from "spotify-web-api-js";
 import useSmoothProgress from "../hooks/useSmoothProgress";

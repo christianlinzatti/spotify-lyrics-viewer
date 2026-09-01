@@ -1,4 +1,5 @@
-import { Box, Container, CssBaseline, ThemeProvider } from "@material-ui/core";
+import { Box, Container, CssBaseline } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import React, { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { deleteSession, spotifyGetCurrentToken } from "./api";

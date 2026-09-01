@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Typography } from "@material-ui/core";
+import { Box, CircularProgress, Typography } from "@mui/material";
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Config from "../../config";

@@ -6,12 +6,12 @@ import {
   TextField,
   Toolbar,
   Typography,
-  makeStyles
-} from "@material-ui/core";
-import CloseIcon from "@material-ui/icons/Close";
-import SearchIcon from "@material-ui/icons/Search";
-import SyncEnabledIcon from "@material-ui/icons/Sync";
-import SyncDisabledIcon from "@material-ui/icons/SyncDisabled";
+} from "@mui/material";
+import { makeStyles } from "@mui/styles";
+import CloseIcon from "@mui/icons-material/Close";
+import SearchIcon from "@mui/icons-material/Search";
+import SyncEnabledIcon from "@mui/icons-material/Sync";
+import SyncDisabledIcon from "@mui/icons-material/SyncDisabled";
 import MarkJS from "mark.js";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { IFoundLyrics } from "../../../../src/dto";

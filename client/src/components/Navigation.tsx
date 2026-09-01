@@ -10,11 +10,13 @@ import {
   makeStyles,
   useMediaQuery,
   useTheme
-} from "@material-ui/core";
-import AccountCircleIcon from "@material-ui/icons/AccountCircle";
-import DarkModeIcon from "@material-ui/icons/Brightness4";
-import LightModeIcon from "@material-ui/icons/Brightness7";
-import GitHubIcon from "@material-ui/icons/GitHub";
+} from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { makeStyles } from "@mui/styles";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import DarkModeIcon from "@mui/icons-material/Brightness4";
+import LightModeIcon from "@mui/icons-material/Brightness7";
+import GitHubIcon from "@mui/icons-material/GitHub";
 import React from "react";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import BannerImageDark from "../img/banner-dark.png";
