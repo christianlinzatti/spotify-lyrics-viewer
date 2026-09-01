@@ -11,8 +11,9 @@ const modules = [
   'exactProp',
   'isMuiElement',
   'unsupportedProp',
-  'requirePropFactory'
-];
+  'requirePropFactory',
+    'refType'
+  ];
 
 modules.forEach((modName) => {
   const target = path.join(__dirname, '..', 'node_modules', '@mui', 'utils', `${modName}.js`);
