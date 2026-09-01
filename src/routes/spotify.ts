@@ -310,8 +310,8 @@ router.post("/logout", async (req, res) => {
 
 const app = express();
 
+// Nur unter dem API-Subroute mounten. Root-Mount entfernt, um doppelte Handler-/Pfad-Konflikte zu vermeiden.
 app.use(subRoute, router);
-app.use("/", router);
 
 // EXPORTIEREN ALS VERCEL HANDLER (löst das 'apply' Problem)
 export default function handler(req: any, res: any) {

@@ -1,0 +1,2 @@
+# Redirect all requests to index.html (Single Page App fallback)
+/*    /index.html   200
