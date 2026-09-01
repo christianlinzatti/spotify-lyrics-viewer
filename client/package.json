@@ -37,8 +37,9 @@
     "build": "react-scripts --openssl-legacy-provider build",
     "postbuild": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" tools/copy-index.ts",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
-  },
+    "deploy": "gh-pages -d build",
+    "postinstall": "node ./scripts/patch-mui-chainprop.js"
+  }
   "eslintConfig": {
     "extends": "react-app"
   },
