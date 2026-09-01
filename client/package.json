@@ -48,6 +48,9 @@
       "last 1 safari version"
     ]
   },
+  "overrides": {
+    "@material-ui/utils": "4.11.3"
+  },
   "devDependencies": {
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
