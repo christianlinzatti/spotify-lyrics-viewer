@@ -282,4 +282,11 @@ router.get("/:artistName", async (req, res) => {
   }
 });
 
-export default router;
+export default function handler(req: any, res: any) {
+  return router(req, res, (err?: any) => {
+    if (err) {
+      console.error("Artist Router Error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+}

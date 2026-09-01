@@ -25,4 +25,11 @@ router.delete("/", (req, res) => {
   });
 });
 
-export default router;
+export default function handler(req: any, res: any) {
+  return router(req, res, (err?: any) => {
+    if (err) {
+      console.error("Express Router Error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+}
