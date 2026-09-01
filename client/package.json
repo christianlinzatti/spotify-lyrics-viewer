@@ -58,5 +58,8 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "gh-pages": "^6.1.1"
+  },
+  "overrides": {
+    "@material-ui/utils": "4.10.2"
   }
 }
