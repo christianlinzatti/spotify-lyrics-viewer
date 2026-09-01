@@ -7,9 +7,7 @@ import {
   Link as MuiLink,
   Toolbar,
   Typography,
-  makeStyles,
-  useMediaQuery,
-  useTheme
+  useMediaQuery
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { makeStyles } from "@mui/styles";
