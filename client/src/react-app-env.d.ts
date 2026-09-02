@@ -8,3 +8,7 @@ declare module 'lrc-kit' {
   export function parse(text: string): Lyric[];
   export function stringify(lyrics: Lyric[]): string;
 }
+declare module "*.css" {
+  const content: { [className: string]: string };
+  export default content;
+}

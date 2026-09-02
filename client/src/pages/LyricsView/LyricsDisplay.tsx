@@ -1,3 +1,7 @@
+import CloseIcon from "@mui/icons-material/Close";
+import SearchIcon from "@mui/icons-material/Search";
+import SyncEnabledIcon from "@mui/icons-material/Sync";
+import SyncDisabledIcon from "@mui/icons-material/SyncDisabled";
 import {
   Box,
   IconButton,
@@ -7,11 +11,6 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { makeStyles } from "@mui/styles";
-import CloseIcon from "@mui/icons-material/Close";
-import SearchIcon from "@mui/icons-material/Search";
-import SyncEnabledIcon from "@mui/icons-material/Sync";
-import SyncDisabledIcon from "@mui/icons-material/SyncDisabled";
 import MarkJS from "mark.js";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { IFoundLyrics } from "../../../../src/dto";
@@ -25,7 +24,6 @@ interface IProps {
 }
 
 const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progressMs, paused }) => {
-  const classes = useStyles();
   const lyricsRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const highlightedRef = useRef<HTMLSpanElement | null>(null);
@@ -54,7 +52,7 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
     }
   }, [search, lyricsDetails]);
 
-  // 2. Focus search input when search button is clicked (FIX: inputRef am TextField ergänzt)
+  // 2. Focus search input when search button is clicked
   useEffect(() => {
     if (searchShown && searchInputRef.current !== null) {
       searchInputRef.current.focus();
@@ -72,7 +70,7 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
     if (syncEnabled && element !== null && lyricsState.highlighted !== "") {
       element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     }
-  }, [syncEnabled, lyricsState.highlighted]); // Abhängigkeit auf highlighted reduziert!
+  }, [syncEnabled, lyricsState.highlighted]);
 
   const onUserSearch = (event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) =>
     setSearch(event.currentTarget.value ?? "");
@@ -80,12 +78,28 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
   const toggleSyncEnabled = () => setSyncEnabled(s => !s);
 
   return (
-    <div className={classes.root}>
-      <Toolbar className={classes.toolbar}>
+    <Box
+      sx={{
+        margin: "auto",
+        maxWidth: 700,
+        position: "relative",
+        textAlign: "center"
+      }}
+    >
+      <Toolbar
+        disableGutters
+        sx={{
+          padding: 0,
+          margin: "-6px -6px 0 0",
+          position: "fixed",
+          right: 60,
+          top: 75
+        }}
+      >
         {searchShown ? (
           <Box mb={1}>
             <TextField
-              inputRef={searchInputRef} // FIX: Ref hier gebunden!
+              inputRef={searchInputRef}
               variant="outlined"
               value={search}
               onChange={onUserSearch}
@@ -100,7 +114,7 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
               }}
               label="Search"
               placeholder="Search lyrics you heard to find your position..."
-              style={{ width: "100%", maxWidth: 600 }}
+              sx={{ width: "100%", maxWidth: 600 }}
             />
           </Box>
         ) : (
@@ -112,20 +126,37 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
           {syncEnabled ? <SyncEnabledIcon /> : <SyncDisabledIcon />}
         </IconButton>
       </Toolbar>
-      <div>
-        <Typography component="div" className={classes.lyrics} ref={lyricsRef} id="lyrics-main">
+
+      <Box>
+        <Typography
+          component="div"
+          ref={lyricsRef}
+          id="lyrics-main"
+          sx={{ whiteSpace: "pre-wrap" }}
+        >
           <span id="lyrics-passed">{lyricsState.before}</span>
 
           {lyricsState.highlighted !== "" && (
-            <div className={classes.highlightedLyricsWrapper}>
-              <span className={classes.highlightedLyrics} ref={highlightedRef} id="lyrics-current">
+            <Box sx={{ my: 2.5 }}>
+              <Box
+                component="span"
+                ref={highlightedRef}
+                id="lyrics-current"
+                sx={{
+                  py: "0.1em",
+                  whiteSpace: "pre-wrap",
+                  fontWeight: "bolder",
+                  fontSize: { xs: "3em", sm: "5em" }
+                }}
+              >
                 {lyricsState.highlighted}
-              </span>
-            </div>
+              </Box>
+            </Box>
           )}
 
           <span id="lyrics-upcoming">{lyricsState.after}</span>
         </Typography>
+
         <Box mt={2} textAlign="left">
           <Typography id="lyrics-provider">
             <Link href={lyricsDetails.attribution} target="_blank" rel="noopener noreferrer">
@@ -133,8 +164,8 @@ const LyricsDisplay: React.FunctionComponent<IProps> = ({ lyricsDetails, progres
             </Link>
           </Typography>
         </Box>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 };
 
@@ -183,37 +214,5 @@ const calculateLyricsState = (
 
   return { before, highlighted, after };
 };
-
-const useStyles = makeStyles(theme => ({
-  lyrics: {
-    whiteSpace: "pre-wrap"
-  },
-  highlightedLyricsWrapper: {
-    marginTop: 20,
-    marginBottom: 20
-  },
-  highlightedLyrics: {
-    padding: "0.1em 0",
-    whiteSpace: "pre-wrap",
-    fontWeight: "bolder",
-    fontSize: "5em",
-    [theme.breakpoints.down("xs")]: {
-      fontSize: "3em"
-    }
-  },
-  root: {
-    margin: "auto",
-    maxWidth: 700,
-    position: "relative",
-    textAlign: "center"
-  },
-  toolbar: {
-    padding: 0,
-    margin: "-6px -6px 0 0",
-    position: "fixed",
-    right: 60,
-    top: 75
-  }
-}));
 
 export default LyricsDisplay;

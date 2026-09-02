@@ -1,5 +1,5 @@
-import express, { Request, Response } from "express";
-import NodeCache from "node-cache";
+import express from "express";
+import NodeCache from "node-cache"; // Falls es weiterhin meckert: import * as NodeCache from "node-cache";
 import { getLyrics as getLyricsFromGenius } from "../api/genius";
 import { getLyrics as getLyricsFromLrcLib } from "../api/lrclib";
 import config from "../config";
@@ -8,14 +8,9 @@ import { IFoundLyrics } from "../dto";
 export const subRoute = "/api/lyrics";
 const router = express.Router();
 
-const lyricsCache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 });
-
-interface LyricsQuery {
-  artists?: string | string[];
-  title?: string;
-  albumName?: string;
-  duration?: string;
-}
+// Falls TS meckert, dass NodeCache keine Konstruktor-Funktion ist:
+const CacheConstructor = typeof NodeCache === "function" ? NodeCache : (NodeCache as any).default || NodeCache;
+const lyricsCache = new CacheConstructor({ stdTTL: 86400, checkperiod: 3600 });
 
 function cleanTrackTitle(title: string): string {
   return title
@@ -26,18 +21,31 @@ function cleanTrackTitle(title: string): string {
     .trim();
 }
 
-router.get("/", async (req: express.Request, res: Response) => {
+router.get("/", async (req: any, res: any) => {
   try {
-    const { artists, title, albumName, duration } = req.query;
+    const artistsQuery = req.query.artists;
+    const titleQuery = req.query.title;
+    const albumNameQuery = req.query.albumName;
+    const durationQuery = req.query.duration;
 
-    if (!artists || !title || !albumName || !duration) {
+    if (!artistsQuery || !titleQuery || !albumNameQuery || !durationQuery) {
       return res.status(400).json({
         error: "Please provide 'artists', 'title', 'albumName', and 'duration'"
       });
     }
 
-    const artistArray = typeof artists === "string" ? [artists] : artists;
-    const durationNum = Number(duration);
+    const title = Array.isArray(titleQuery) ? String(titleQuery[0]) : String(titleQuery);
+    const albumName = Array.isArray(albumNameQuery) ? String(albumNameQuery[0]) : String(albumNameQuery);
+    const durationStr = Array.isArray(durationQuery) ? String(durationQuery[0]) : String(durationQuery);
+
+    let artistArray: string[] = [];
+    if (Array.isArray(artistsQuery)) {
+      artistArray = artistsQuery.map(a => String(a));
+    } else {
+      artistArray = [String(artistsQuery)];
+    }
+
+    const durationNum = Number(durationStr);
 
     if (isNaN(durationNum)) {
       return res.status(400).json({ error: "'duration' must be a valid number" });
@@ -47,7 +55,7 @@ router.get("/", async (req: express.Request, res: Response) => {
     const mainArtist = artistArray[0] || "";
 
     const cacheKey = `lyrics_${mainArtist.toLowerCase()}_${cleanedTitle.toLowerCase()}`;
-    const cachedLyrics = lyricsCache.get<IFoundLyrics>(cacheKey);
+    const cachedLyrics = lyricsCache.get(cacheKey) as IFoundLyrics | undefined;
 
     if (cachedLyrics) {
       res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=43200");
@@ -90,7 +98,6 @@ router.get("/", async (req: express.Request, res: Response) => {
     lyricsCache.set(cacheKey, lyricsResult);
     res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=43200");
 
-    // Gibt direkt IFoundLyrics zurück (inkl. plainLyrics & syncedLyrics)
     return res.json(lyricsResult);
 
   } catch (error) {

@@ -13,7 +13,7 @@ const parseHeader = (header: string | string[] | undefined): string => {
   return raw.split(",")[0].trim();
 };
 
-const getRedirectUri = (req: express.Request): string => {
+const getRedirectUri = (req: any): string => {
   if (process.env.SPOTIFY_REDIRECT_URI) {
     return process.env.SPOTIFY_REDIRECT_URI;
   }
@@ -34,7 +34,7 @@ const millisecondsOffsetFromNow = (offsetInSeconds: number): number =>
 /**
  * Validiert die Origin-URL, um Open-Redirect-Schwachstellen zu verhindern.
  */
-const sanitizeOrigin = (req: express.Request): string => {
+const sanitizeOrigin = (req: any): string => {
   const referer = req.headers.referer;
   const fallback = process.env.CLIENT_URL || "/";
 
@@ -44,7 +44,6 @@ const sanitizeOrigin = (req: express.Request): string => {
     const refererUrl = new URL(referer);
     const host = parseHeader(req.headers["x-forwarded-host"]) || parseHeader(req.headers.host);
 
-    // Erlaube nur Referer von derselben Domain oder einer explizit definierten CLIENT_URL
     if (host && refererUrl.host === host) {
       return referer;
     }
@@ -55,13 +54,13 @@ const sanitizeOrigin = (req: express.Request): string => {
       }
     }
   } catch {
-    // Ungültige URL-Formatierung -> Fallback nutzen
+    // Ungültiges URL-Format
   }
 
   return fallback;
 };
 
-const clearSpotifySession = (req: express.Request): void => {
+const clearSpotifySession = (req: any): void => {
   if (!req.session) return;
   delete req.session.access_token;
   delete req.session.refresh_token;
@@ -74,7 +73,7 @@ const clearSpotifySession = (req: express.Request): void => {
 const router = express.Router();
 const Config = config;
 
-async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPair> {
+async function refreshSpotifyToken(req: any): Promise<ITokenExpiryPair> {
   if (!req.session || !req.session.refresh_token) {
     throw new Error("No active session or refresh token available");
   }
@@ -100,9 +99,8 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
       req.session.refresh_token = responseBody.refresh_token;
     }
 
-    // Sicherstellen, dass die Session im Storage gespeichert wird
     await new Promise<void>((resolve, reject) => {
-      req.session.save((err) => (err ? reject(err) : resolve()));
+      req.session.save((err: any) => (err ? reject(err) : resolve()));
     });
 
     return {
@@ -110,13 +108,12 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
       expiresAt: req.session.expires_at
     };
   } catch (error) {
-    // Falls Token ungültig/widerrufen wurde, verfallene Session-Daten löschen
     clearSpotifySession(req);
     throw error;
   }
 }
 
-router.get("/authenticate", async (req, res) => {
+router.get("/authenticate", async (req: any, res: any) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is not initialized" });
   }
@@ -150,8 +147,7 @@ router.get("/authenticate", async (req, res) => {
     req.session.authentication_origin = origin;
     req.session.redirected_uri = redirectUri;
 
-    // Session explizit speichern, bevor der Redirect durchgeführt wird
-    req.session.save((err) => {
+    req.session.save((err: any) => {
       if (err) {
         console.error("Failed to save session before redirect:", err);
         return res.status(500).json({ error: "Failed to initialize authentication session" });
@@ -164,17 +160,15 @@ router.get("/authenticate", async (req, res) => {
   }
 });
 
-router.get("/authentication-callback", async (req, res) => {
+router.get("/authentication-callback", async (req: any, res: any) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session missing" });
   }
 
-  // 1. Werte VOR dem Löschen in Variablen sichern
   const savedState = req.session.authentication_state;
   const requestOrigin = req.session.authentication_origin || process.env.CLIENT_URL || "/";
   const redirectUri = req.session.redirected_uri || getRedirectUri(req);
 
-  // 2. Jetzt die Session aufräumen
   delete req.session.authentication_state;
   delete req.session.authentication_origin;
   delete req.session.redirected_uri;
@@ -186,7 +180,6 @@ router.get("/authentication-callback", async (req, res) => {
     return res.redirect(`${requestOrigin}?error=access_denied`);
   }
 
-  // 3. Gegen den gesicherten savedState prüfen
   if (!state || typeof state !== "string" || state !== savedState) {
     return res.redirect(`${requestOrigin}?error=state_mismatch`);
   }
@@ -224,7 +217,7 @@ router.get("/authentication-callback", async (req, res) => {
       targetUrl = requestOrigin;
     }
 
-    req.session.save((err) => {
+    req.session.save((err: any) => {
       if (err) {
         console.error("Failed to save session in callback:", err);
         return res.redirect(`${requestOrigin}?error=session_save_failed`);
@@ -237,14 +230,14 @@ router.get("/authentication-callback", async (req, res) => {
   }
 });
 
-router.get("/token", async (req, res) => {
+router.get("/token", async (req: any, res: any) => {
   if (!req.session || !req.session.access_token || !req.session.refresh_token) {
     return res.status(401).json({ error: "No Spotify session available" });
   }
 
   const now = Date.now();
   const expiresAt = req.session.expires_at || 0;
-  const isExpiringSoon = expiresAt - now < 60000; // Unter 60s Restlaufzeit
+  const isExpiringSoon = expiresAt - now < 60000;
 
   if (isExpiringSoon || !isStoredTokenValid(req)) {
     try {
@@ -255,14 +248,13 @@ router.get("/token", async (req, res) => {
     }
   }
 
-  // Einheitliche Key-Namen (camelCase wie in refreshSpotifyToken)
   return res.json({
     accessToken: req.session.access_token,
     expiresAt: req.session.expires_at
   });
 });
 
-router.get("/refresh-token", async (req, res) => {
+router.get("/refresh-token", async (req: any, res: any) => {
   if (!req.session || !req.session.refresh_token) {
     return res.status(401).json({ error: "No refresh token available" });
   }
@@ -275,10 +267,10 @@ router.get("/refresh-token", async (req, res) => {
   }
 });
 
-router.post("/logout", (req, res) => {
+router.post("/logout", (req: any, res: any) => {
   clearSpotifySession(req);
   if (req.session) {
-    req.session.save(() => {
+    req.session.save((err: any) => {
       res.json({ success: true, message: "Logged out from Spotify" });
     });
   } else {

@@ -1,9 +1,8 @@
-import { AppBar, Box, Container, Slider } from "@mui/material";
-import { makeStyles } from "@mui/styles";
 import PauseCircleFilledIcon from "@mui/icons-material/PauseCircleFilled";
 import PlayCircleFilledIcon from "@mui/icons-material/PlayCircleFilled";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
+import { AppBar, Box, Container, IconButton, Slider, Typography } from "@mui/material";
 import React from "react";
 import SpotifyWebApi from "spotify-web-api-js";
 import useSmoothProgress from "../hooks/useSmoothProgress";
@@ -13,7 +12,7 @@ import { IToken } from "../types/token";
 import { formatMilliseconds, responseError } from "../utils";
 
 const placeholder1PxImage =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mO8+x8AAr8B3gzOjaQAAAAASUVORK5CYII="; // Generated using https://png-pixel.com/
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mO8+x8AAr8B3gzOjaQAAAAASUVORK5CYII=";
 
 interface PlayerProps {
   currentlyPlayingSong: CurrentlyPlayingState;
@@ -21,9 +20,7 @@ interface PlayerProps {
 }
 
 const Player: React.FC<PlayerProps> = ({ currentlyPlayingSong, token }) => {
-  const classes = useStyles();
-
-  let albumArt = currentlyPlayingSong.currentlyPlayingObject?.item?.album.images[0].url;
+  let albumArt = currentlyPlayingSong.currentlyPlayingObject?.item?.album.images[0]?.url;
   let title = currentlyPlayingSong.currentlyPlayingObject?.item?.name ?? "---";
   let artist =
     currentlyPlayingSong.currentlyPlayingObject?.item?.artists.map(a => a.name).join(", ") ?? "---";
@@ -35,7 +32,7 @@ const Player: React.FC<PlayerProps> = ({ currentlyPlayingSong, token }) => {
     albumArt = SpotifyLogoRoundImage;
     title = "Advertisement";
     artist = "Spotify";
-    durationMs = Math.max(progressMs, 30 * 1000); // Typically 30s but allow for something over
+    durationMs = Math.max(progressMs, 30 * 1000);
   }
 
   const {
@@ -51,6 +48,7 @@ const Player: React.FC<PlayerProps> = ({ currentlyPlayingSong, token }) => {
       spotifyApi.skipToPrevious().catch(e => responseError("Failed to Skip to Previous Song", e));
     }
   };
+
   const onSkipNext = () => {
     if (token) {
       const spotifyApi = new SpotifyWebApi();
@@ -60,6 +58,7 @@ const Player: React.FC<PlayerProps> = ({ currentlyPlayingSong, token }) => {
       });
     }
   };
+
   const onPlayPauseToggle = () => {
     if (token) {
       const spotifyApi = new SpotifyWebApi();
@@ -73,139 +72,150 @@ const Player: React.FC<PlayerProps> = ({ currentlyPlayingSong, token }) => {
   };
 
   return (
-    <AppBar position="static" color="primary" className={classes.appBar}>
+    <AppBar
+      position="static"
+      color="primary"
+      sx={{
+        backgroundColor: "background.paper",
+        top: "auto",
+        bottom: 0,
+        py: 0.75
+      }}
+    >
       <Container maxWidth="md">
-        <div className={classes.playerWrapper}>
-          <div className={classes.songWrapper}>
-            <div className={classes.songAlbumArtWrapper}>
-              <img
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "auto auto", sm: "auto auto 1fr" },
+            gridColumnGap: 16,
+            alignItems: "center"
+          }}
+        >
+          {/* Song Info */}
+          <Box
+            sx={{
+              display: "inline-grid",
+              gridTemplateColumns: "auto 1fr",
+              gridTemplateRows: "1fr 1fr",
+              gridColumnGap: "5px",
+              maxWidth: 250,
+              alignItems: "center"
+            }}
+          >
+            <Box
+              sx={{
+                gridColumn: "1 / 2",
+                gridRow: "1 / 3",
+                display: "flex",
+                alignItems: "center"
+              }}
+            >
+              <Box
+                component="img"
                 src={albumArt ?? placeholder1PxImage}
-                className={classes.songAlbumArt}
-                alt={`Album art for current song`}
+                alt="Album art for current song"
+                sx={{ height: 40, width: 40, borderRadius: 1 }}
               />
-            </div>
-            <div className={classes.songDetail} title={title}>
+            </Box>
+            <Typography
+              variant="body2"
+              title={title}
+              sx={{
+                color: "text.primary",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                fontWeight: 600
+              }}
+            >
               {title}
-            </div>
-            <div className={classes.songDetail} title={artist}>
+            </Typography>
+            <Typography
+              variant="caption"
+              title={artist}
+              sx={{
+                color: "text.secondary",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
+              }}
+            >
               {artist}
-            </div>
-          </div>
+            </Typography>
+          </Box>
 
-          <div className={classes.controlsWrapper}>
-            <SkipPreviousIcon
-              fontSize="large"
-              className={classes.control}
-              onClick={onSkipPrevious}
-            />
+          {/* Controls */}
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <IconButton onClick={onSkipPrevious} sx={{ color: "text.primary" }}>
+              <SkipPreviousIcon fontSize="large" />
+            </IconButton>
 
-            {isPlaying ? (
-              <PauseCircleFilledIcon
-                fontSize="large"
-                htmlColor="black"
-                onClick={onPlayPauseToggle}
-                className={classes.control}
-              />
-            ) : (
-              <PlayCircleFilledIcon
-                fontSize="large"
-                htmlColor="black"
-                onClick={onPlayPauseToggle}
-                className={classes.control}
-              />
-            )}
+            <IconButton onClick={onPlayPauseToggle} sx={{ color: "text.primary" }}>
+              {isPlaying ? (
+                <PauseCircleFilledIcon fontSize="large" />
+              ) : (
+                <PlayCircleFilledIcon fontSize="large" />
+              )}
+            </IconButton>
 
-            <SkipNextIcon fontSize="large" className={classes.control} onClick={onSkipNext} />
-          </div>
+            <IconButton onClick={onSkipNext} sx={{ color: "text.primary" }}>
+              <SkipNextIcon fontSize="large" />
+            </IconButton>
+          </Box>
 
-          <Box display="inline-flex" alignItems="center" className={classes.sliderWrapper}>
-            <span className={classes.timeControl}>{formatMilliseconds(smoothedProgressMs)}</span>
+          {/* Timeline / Slider */}
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gridColumn: { xs: "1 / 3", sm: "auto" },
+              width: "100%"
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{ color: "text.primary", whiteSpace: "nowrap" }}
+            >
+              {formatMilliseconds(smoothedProgressMs)}
+            </Typography>
 
             <Slider
               valueLabelDisplay="off"
-              value={smoothedProgressMs}
+              value={Math.min(smoothedProgressMs, durationMs || 1)}
               min={0}
-              max={durationMs}
-              onChangeCommitted={onUserFinishedSliding}
-              onChange={onUserSlide}
-              className={classes.slider}
+              max={durationMs || 1}
+              disabled={durationMs === 0}
+              onChange={(_: any, value: number | number[]) => {
+                const numericValue = Array.isArray(value) ? value[0] : value;
+                (onUserSlide as any)(numericValue);
+              }}
+              onChangeCommitted={(_: any, value: number | number[]) => {
+                const numericValue = Array.isArray(value) ? value[0] : value;
+                (onUserFinishedSliding as any)(numericValue);
+              }}
+              sx={{
+                mx: 2,
+                py: { xs: 1.25, sm: 1.5 }
+              }}
             />
-            <span className={classes.timeControl}>{formatMilliseconds(durationMs)}</span>
+
+            <Typography
+              variant="caption"
+              sx={{ color: "text.primary", whiteSpace: "nowrap" }}
+            >
+              {formatMilliseconds(durationMs)}
+            </Typography>
           </Box>
-        </div>
+        </Box>
       </Container>
     </AppBar>
   );
 };
-
-const useStyles = makeStyles(theme => ({
-  appBar: {
-    backgroundColor: theme.palette.background.paper,
-    top: "auto",
-    bottom: 0,
-    background: "#f8f9fa",
-    paddingTop: 6,
-    paddingBottom: 6
-  },
-  playerWrapper: {
-    display: "grid",
-    gridTemplateColumns: "auto auto 1fr",
-    gridColumnGap: 16,
-    [theme.breakpoints.down("xs")]: {
-      gridTemplateColumns: "auto auto"
-    }
-  },
-  songWrapper: {
-    display: "inline-grid",
-    gridTemplateColumns: "auto 1fr",
-    gridTemplateRows: "1fr 1fr",
-    gridColumnGap: 5,
-    maxWidth: 250
-  },
-  songAlbumArtWrapper: {
-    gridColumnStart: 1,
-    gridColumnEnd: 2,
-    gridRowStart: 1,
-    gridRowEnd: 3
-  },
-  songAlbumArt: {
-    height: 40,
-    width: 40
-  },
-  songDetail: {
-    color: theme.palette.text.primary,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis"
-  },
-  timeControl: {
-    color: theme.palette.text.primary,
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis"
-  },
-  controlsWrapper: {
-    display: "inline-grid",
-    gridTemplateColumns: "auto auto auto",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  control: {
-    color: theme.palette.text.primary,
-    cursor: "pointer"
-  },
-  sliderWrapper: {
-    [theme.breakpoints.down("xs")]: {
-      gridColumnStart: 1,
-      gridColumnEnd: 3
-    }
-  },
-  slider: {
-    [theme.breakpoints.down("xs")]: {
-      padding: "10px 0"
-    },
-    marginLeft: 10,
-    marginRight: 10
-  }
-}));
 
 export default Player;

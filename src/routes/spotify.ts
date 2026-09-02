@@ -19,7 +19,7 @@ const millisecondsOffsetFromNow = (offsetInSeconds: number): number =>
 /**
  * Ermittelt die absolute Redirect-URI für den Spotify OAuth-Flow.
  */
-const getRedirectUri = (req: express.Request): string => {
+const getRedirectUri = (req: any): string => {
   if (process.env.SPOTIFY_REDIRECT_URI) {
     return process.env.SPOTIFY_REDIRECT_URI;
   }
@@ -41,7 +41,7 @@ const getRedirectUri = (req: express.Request): string => {
 /**
  * Validiert die Referer-URL zur Vermeidung von Open-Redirect-Schwachstellen.
  */
-const sanitizeOrigin = (req: express.Request): string => {
+const sanitizeOrigin = (req: any): string => {
   const referer = req.headers.referer;
   const fallback = process.env.CLIENT_URL || "/";
 
@@ -68,7 +68,7 @@ const sanitizeOrigin = (req: express.Request): string => {
 /**
  * Hilfsfunktion zum Löschen von Spotify-Tokens aus der Session.
  */
-const clearSpotifySession = (req: express.Request): void => {
+const clearSpotifySession = (req: any): void => {
   if (!req.session) return;
   delete req.session.access_token;
   delete req.session.refresh_token;
@@ -81,17 +81,17 @@ const clearSpotifySession = (req: express.Request): void => {
 /**
  * Speichert die Express-Session explizit ab (Promise-basiert).
  */
-const saveSession = (req: express.Request): Promise<void> => {
+const saveSession = (req: any): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (!req.session) return resolve();
-    req.session.save((err) => (err ? reject(err) : resolve()));
+    req.session.save((err: any) => (err ? reject(err) : resolve()));
   });
 };
 
 /**
  * Erneuert das Access Token über die Spotify API.
  */
-async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPair> {
+async function refreshSpotifyToken(req: any): Promise<ITokenExpiryPair> {
   if (!req.session || !req.session.access_token || !req.session.refresh_token) {
     throw new Error("No active session or refresh token available");
   }
@@ -130,9 +130,9 @@ async function refreshSpotifyToken(req: express.Request): Promise<ITokenExpiryPa
   }
 }
 
-// --- ROUTEN DEFINIREN ---
+// --- ROUTEN DEFINIEREN ---
 
-router.get("/authenticate", async (req, res) => {
+router.get("/authenticate", async (req: any, res: any) => {
   if (!req.session) {
     console.error("Express session middleware is missing or not configured correctly.");
     return res.status(500).json({ error: "Session middleware is not initialized" });
@@ -176,7 +176,7 @@ router.get("/authenticate", async (req, res) => {
   }
 });
 
-router.get("/authentication-callback", async (req, res) => {
+router.get("/authentication-callback", async (req: any, res: any) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
   }
@@ -247,7 +247,7 @@ router.get("/authentication-callback", async (req, res) => {
   }
 });
 
-router.get("/token", async (req, res) => {
+router.get("/token", async (req: any, res: any) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
   }
@@ -277,7 +277,7 @@ router.get("/token", async (req, res) => {
   return res.json(responseData);
 });
 
-router.get("/refresh-token", async (req, res) => {
+router.get("/refresh-token", async (req: any, res: any) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
   }
@@ -295,7 +295,7 @@ router.get("/refresh-token", async (req, res) => {
   }
 });
 
-router.post("/logout", async (req, res) => {
+router.post("/logout", async (req: any, res: any) => {
   if (!req.session) {
     return res.status(500).json({ error: "Session middleware is missing" });
   }
@@ -306,14 +306,12 @@ router.post("/logout", async (req, res) => {
   return res.json({ success: true, message: "Logged out from Spotify" });
 });
 
-// --- EXPRESS APP INIZIALISIEREN & EXPORTIEREN (ERST NACH ALLEN ROUTEN!) ---
+// --- EXPRESS APP INITIALISIEREN & EXPORTIEREN ---
 
 const app = express();
 
-// Nur unter dem API-Subroute mounten. Root-Mount entfernt, um doppelte Handler-/Pfad-Konflikte zu vermeiden.
 app.use(subRoute, router);
 
-// EXPORTIEREN ALS VERCEL HANDLER (löst das 'apply' Problem)
 export default function handler(req: any, res: any) {
   return app(req, res, (err?: any) => {
     if (err) {

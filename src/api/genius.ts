@@ -1,5 +1,5 @@
 import axios from "axios";
-import cheerio from "cheerio";
+import cheerio, { CheerioAPI } from "cheerio";
 import diacritics from "diacritics";
 import { IFoundLyrics } from "../dto";
 
@@ -74,7 +74,7 @@ const getGeniusPath = async (
 ) => {
   const search1 = await searchGenius(`${artists[0]} ${title}`, geniusApiToken);
   if (
-    search1.hits.length > 0 &&
+    search1?.hits?.length > 0 &&
     search1.hits[0].result.primary_artist.name.indexOf(artists[0]) !== -1
   ) {
     return search1.hits[0].result.path;
@@ -84,21 +84,21 @@ const getGeniusPath = async (
   const primaryArtistInSearch2 = artists.reduce(
     (acc, curr) =>
       acc ||
-      (search2.hits.length > 0 && search2.hits[0].result.primary_artist.name.indexOf(curr) !== -1),
+      (search2?.hits?.length > 0 && search2.hits[0].result.primary_artist.name.indexOf(curr) !== -1),
     false
   );
-  if (search2.hits.length !== 0 && primaryArtistInSearch2) {
+  if (search2?.hits?.length > 0 && primaryArtistInSearch2) {
     return search2.hits[0].result.path;
   }
 
-  if (search1.hits.length > 0) {
+  if (search1?.hits?.length > 0) {
     return search1.hits[0].result.path;
   }
 
   return null;
 };
 
-function getTitle($: CheerioStatic) {
+function getTitle($: CheerioAPI) {
   const attempt1 = $("h1.header_with_cover_art-primary_info-title").text();
   if (attempt1 !== "") {
     return attempt1;
@@ -112,7 +112,7 @@ function getTitle($: CheerioStatic) {
   return "";
 }
 
-function getArtist($: CheerioStatic) {
+function getArtist($: CheerioAPI) {
   const attempt1 = $("a.header_with_cover_art-primary_info-primary_artist").text();
   if (attempt1 !== "") {
     return attempt1;
@@ -126,25 +126,22 @@ function getArtist($: CheerioStatic) {
   return "";
 }
 
-function getLyricContents($: CheerioStatic) {
-  $("a", ".lyrics").each((index, element) => {
-    const e = $(element);
-    const elementHtml = e.html();
-    if (elementHtml === null) throw new Error("Unexpected application state: elementHtml === null");
-    return e.replaceWith(elementHtml);
-  }); // Replace out all links in the scope
-  const attempt1 = $($(".lyrics")[0]).text().trim();
-  if (attempt1 !== "") {
-    return attempt1;
+function getLyricContents($: CheerioAPI): string {
+  let lyrics = "";
+
+  // Neueres Genius Layout (Lyrics-Container mit Data-Attribut)
+  $('[data-lyrics-container="true"]').each((_, element) => {
+    $(element).find("br").replaceWith("\n");
+    lyrics += $(element).text() + "\n";
+  });
+
+  if (lyrics.trim() !== "") {
+    return lyrics.trim();
   }
 
-  $("div[class*=Lyrics__Root-]").children().find("br").replaceWith("\n");
-  const attempt2 = $("div[class*=Lyrics__Container-]").text();
-  if (attempt2 !== "") {
-    return attempt2;
-  }
-
-  return "";
+  // Älteres Genius Layout Fallback (.lyrics Container)
+  $(".lyrics").find("br").replaceWith("\n");
+  return $(".lyrics").text().trim();
 }
 
 export const getLyricsForPath = async (geniusPath: string): Promise<IFoundLyrics | null> => {
@@ -160,12 +157,12 @@ export const getLyricsForPath = async (geniusPath: string): Promise<IFoundLyrics
     }
 
     const html = response.data;
-    const $ = cheerio.load(html); // Load in the page
+    const $ = cheerio.load(html);
     const title = getTitle($);
     const artist = getArtist($);
     const lyrics = getLyricContents($);
 
-    if (lyrics === undefined) {
+    if (!lyrics) {
       return null;
     }
 
@@ -177,7 +174,6 @@ export const getLyricsForPath = async (geniusPath: string): Promise<IFoundLyrics
       syncedLyrics: null
     } as IFoundLyrics;
   } catch (e) {
-    // Anything non-200 or 404 is considered an error
     console.warn(`Failed to call '${requestUrl}'`);
 
     if (e instanceof Error && e.stack !== undefined) {
@@ -187,8 +183,6 @@ export const getLyricsForPath = async (geniusPath: string): Promise<IFoundLyrics
     if (axios.isAxiosError(e)) {
       if (e.response !== undefined) {
         console.log(`Response: HTTP${e.response.status} ${e.response.statusText}`);
-        console.log(`Response headers: ${JSON.stringify(e.response.headers)}`);
-        console.log(`Response data: ${JSON.stringify(e.response.data)}`);
       } else {
         console.log("No response");
       }
@@ -206,7 +200,7 @@ export const getLyrics = async (
   albumName: string,
   durationMs: number,
   geniusApiToken: string
-) => {
+): Promise<IFoundLyrics | null> => {
   const geniusPath = await getGeniusPath(artists, title, albumName, durationMs, geniusApiToken);
   if (geniusPath === null) {
     return null;

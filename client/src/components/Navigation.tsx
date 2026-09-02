@@ -1,3 +1,7 @@
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import DarkModeIcon from "@mui/icons-material/Brightness4";
+import LightModeIcon from "@mui/icons-material/Brightness7";
+import GitHubIcon from "@mui/icons-material/GitHub";
 import {
   AppBar,
   Avatar,
@@ -10,11 +14,6 @@ import {
   useMediaQuery
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { makeStyles } from "@mui/styles";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import DarkModeIcon from "@mui/icons-material/Brightness4";
-import LightModeIcon from "@mui/icons-material/Brightness7";
-import GitHubIcon from "@mui/icons-material/GitHub";
 import React from "react";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import BannerImageDark from "../img/banner-dark.png";
@@ -39,7 +38,6 @@ const Navigation: React.FunctionComponent<IProps> = ({
   onThemeToggle,
   isDarkMode
 }) => {
-  const classes = useStyles();
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -58,42 +56,65 @@ const Navigation: React.FunctionComponent<IProps> = ({
   };
 
   return (
-    <AppBar position="static" className={classes.appBar}>
+    <AppBar
+      position="static"
+      sx={{
+        backgroundColor: "background.paper",
+        boxShadow: "none"
+      }}
+    >
       <Container maxWidth="md">
-        <Toolbar className={classes.toolbar}>
-          <MuiLink component={RouterLink} to="/">
+        <Toolbar sx={{ padding: 0 }}>
+          <MuiLink component={RouterLink} to="/" sx={{ display: "flex", alignItems: "center" }}>
             {showFullLogo ? (
-              <img
+              <Box
+                component="img"
                 src={isDarkMode ? BannerImageDark : BannerImage}
-                height="30"
+                sx={{ height: 30, cursor: "pointer" }}
                 alt="Spotify Lyrics Viewer Banner"
-                className={classes.logo}
               />
             ) : (
-              <img
+              <Box
+                component="img"
                 src={LogoImage}
-                height="30"
+                sx={{ height: 30, cursor: "pointer" }}
                 alt="Spotify Lyrics Viewer Logo"
-                className={classes.logo}
               />
             )}
           </MuiLink>
 
-          {Object.keys(navbarLinks).map(path => (
-            <Box key={path} display="inline" ml={2}>
-              <MuiLink
-                component={RouterLink}
-                to={path}
-                className={`${classes.link} ${location.pathname === path ? classes.activeLink : ""}`}
-              >
-                <Typography variant="body1">{navbarLinks[path]}</Typography>
-              </MuiLink>
-            </Box>
-          ))}
+          {Object.keys(navbarLinks).map(path => {
+            const isActive = location.pathname === path;
+            return (
+              <Box key={path} sx={{ display: "inline", ml: 2 }}>
+                <MuiLink
+                  component={RouterLink}
+                  to={path}
+                  underline="none"
+                  sx={{
+                    textDecoration: "none",
+                    color: isActive ? "text.primary" : "text.secondary",
+                    "&:hover": {
+                      color: "text.primary"
+                    }
+                  }}
+                >
+                  <Typography variant="body1" component="span">
+                    {navbarLinks[path]}
+                  </Typography>
+                </MuiLink>
+              </Box>
+            );
+          })}
 
-          <div className={classes.grow} />
+          {/* Spacer, um die Navigations-Icons nach rechts zu schieben */}
+          <Box sx={{ flexGrow: 1 }} />
 
-          <MuiLink href="https://github.com/brentvollebregt/spotify-lyrics-viewer" target="_blank" rel="noopener noreferrer">
+          <MuiLink
+            href="https://github.com/brentvollebregt/spotify-lyrics-viewer"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <IconButton>
               <GitHubIcon />
             </IconButton>
@@ -112,7 +133,7 @@ const Navigation: React.FunctionComponent<IProps> = ({
                     ? user.images[0].url
                     : undefined
                 }
-                className={classes.userIcon}
+                sx={{ width: 30, height: 30 }}
               >
                 {user.display_name?.substring(0, 1)}
               </Avatar>
@@ -125,35 +146,5 @@ const Navigation: React.FunctionComponent<IProps> = ({
     </AppBar>
   );
 };
-
-const useStyles = makeStyles(theme => ({
-  appBar: {
-    backgroundColor: theme.palette.background.paper
-  },
-  toolbar: {
-    padding: 0
-  },
-  logo: {
-    cursor: "pointer"
-  },
-  link: {
-    textDecoration: "none",
-    color: theme.palette.text.secondary,
-    "&:hover": {
-      color: theme.palette.text.primary,
-      textDecoration: "none"
-    }
-  },
-  activeLink: {
-    color: theme.palette.text.primary
-  },
-  userIcon: {
-    width: 30,
-    height: 30
-  },
-  grow: {
-    flexGrow: 1
-  }
-}));
 
 export default Navigation;
